@@ -17,6 +17,13 @@ TrieCode 官方插件集（开源版）——面向嵌入式和电子设计自�
 | [plugin-dev-toolchain](plugin-dev-toolchain/) | 面向开发者的插件开发脚手架（AI 创建插件） |
 | [easyeda-toolchain](easyeda-toolchain/) | 立创EDA(EasyEDA) 深度集成：原理图自动布局与 A\* 绕障布线引擎、40+ 工具、EDA 端扩展 |
 
+## 官方与第三方
+
+- **本仓库** = TrieCode **官方**插件（组织账号维护，软件内一键安装）
+- **第三方插件**：由社区维护，通过 GitHub `triecode-plugin` topic 发现，**不进官方市场**（安全：插件以用户权限运行，官方市场仅收录可审计代码）
+
+发布 / 贡献你的插件见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
 ## 快速开始
 
 1. 安装 TrieCode（≥ v1.2.4）
