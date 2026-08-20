@@ -1,0 +1,694 @@
+{
+  "id": "stm32-cube-toolchain",
+  "name": "STM32Cube 工具链",
+  "version": "0.1.2",
+  "description": "STM32Cube 原生工具链：编译/烧录 STM32 工程（STM32CubeCLT：CMake+Ninja+arm-none-eabi-gcc+STM32_Programmer_CLI），内置裸机脚手架、串口日志、AI 工具。检测复用本机已装 STM32CubeCLT。",
+  "developer": "TrieCode",
+  "icon": "stm32",
+  "category": "嵌入式工具链",
+  "capabilities": {
+    "compile": {
+      "transport": "cli",
+      "steps": [
+        {
+          "command": [
+            "cmake",
+            "-S",
+            "{projectPath}",
+            "-B",
+            "{projectPath}/build",
+            "-G",
+            "Ninja",
+            "-DCMAKE_TOOLCHAIN_FILE={projectPath}/cmake/gcc-arm-none-eabi.cmake",
+            "-DCMAKE_BUILD_TYPE=Debug"
+          ],
+          "cwd": "{projectPath}"
+        },
+        {
+          "command": [
+            "cmake",
+            "--build",
+            "{projectPath}/build",
+            "--parallel"
+          ],
+          "cwd": "{projectPath}"
+        }
+      ],
+      "env": {
+        "PATH": "{settings.toolchain.active.path}/CMake/bin{pathSeparator}{settings.toolchain.active.path}/Ninja/bin{pathSeparator}{settings.toolchain.active.path}/GNU-tools-for-STM32/bin{pathSeparator}{env.PATH}"
+      },
+      "stream": true,
+      "streamChannel": "compile:onOutput",
+      "timeoutMs": 600000,
+      "maxOutput": 12000
+    },
+    "upload": {
+      "transport": "cli",
+      "steps": [
+        {
+          "command": [
+            "cmake",
+            "-S",
+            "{projectPath}",
+            "-B",
+            "{projectPath}/build",
+            "-G",
+            "Ninja",
+            "-DCMAKE_TOOLCHAIN_FILE={projectPath}/cmake/gcc-arm-none-eabi.cmake",
+            "-DCMAKE_BUILD_TYPE=Debug"
+          ],
+          "cwd": "{projectPath}"
+        },
+        {
+          "command": [
+            "cmake",
+            "--build",
+            "{projectPath}/build",
+            "--parallel"
+          ],
+          "cwd": "{projectPath}"
+        },
+        {
+          "command": [
+            "STM32_Programmer_CLI",
+            "-c",
+            "port=SWD",
+            "freq=4000",
+            "-w",
+            "{defaultArtifact}",
+            "-v",
+            "-rst"
+          ],
+          "cwd": "{projectPath}"
+        }
+      ],
+      "env": {
+        "PATH": "{settings.toolchain.active.path}/CMake/bin{pathSeparator}{settings.toolchain.active.path}/Ninja/bin{pathSeparator}{settings.toolchain.active.path}/GNU-tools-for-STM32/bin{pathSeparator}{settings.toolchain.active.path}/STM32CubeProgrammer/bin{pathSeparator}{env.PATH}"
+      },
+      "stream": true,
+      "streamChannel": "compile:onOutput",
+      "pauseSerialPort": true,
+      "timeoutMs": 600000,
+      "maxOutput": 12000
+    },
+    "flash": {
+      "transport": "cli",
+      "steps": [
+        {
+          "command": [
+            "cmake",
+            "-S",
+            "{projectPath}",
+            "-B",
+            "{projectPath}/build",
+            "-G",
+            "Ninja",
+            "-DCMAKE_TOOLCHAIN_FILE={projectPath}/cmake/gcc-arm-none-eabi.cmake",
+            "-DCMAKE_BUILD_TYPE=Debug"
+          ],
+          "cwd": "{projectPath}"
+        },
+        {
+          "command": [
+            "cmake",
+            "--build",
+            "{projectPath}/build",
+            "--parallel"
+          ],
+          "cwd": "{projectPath}"
+        },
+        {
+          "command": [
+            "STM32_Programmer_CLI",
+            "-c",
+            "port=SWD",
+            "freq=4000",
+            "-w",
+            "{defaultArtifact}",
+            "-v",
+            "-rst"
+          ],
+          "cwd": "{projectPath}"
+        }
+      ],
+      "env": {
+        "PATH": "{settings.toolchain.active.path}/CMake/bin{pathSeparator}{settings.toolchain.active.path}/Ninja/bin{pathSeparator}{settings.toolchain.active.path}/GNU-tools-for-STM32/bin{pathSeparator}{settings.toolchain.active.path}/STM32CubeProgrammer/bin{pathSeparator}{env.PATH}"
+      },
+      "stream": true,
+      "streamChannel": "compile:onOutput",
+      "pauseSerialPort": true,
+      "timeoutMs": 600000,
+      "maxOutput": 12000
+    }
+  },
+  "detection": {
+    "envVars": [
+      "STM32CubeCLT"
+    ],
+    "pathGlobs": [
+      "C:/STM32CubeCLT*",
+      "C:/ST/STM32CubeCLT*",
+      "D:/ProgramData/ST/STM32CubeCLT*",
+      "D:/ST/STM32CubeCLT*",
+      "$USERPROFILE/st/stm32cubeclt*",
+      "~/st/stm32cubeclt*"
+    ],
+    "validateFile": "GNU-tools-for-STM32/bin"
+  },
+  "projectDetection": {
+    "markers": [
+      {
+        "file": "CMakeLists.txt",
+        "contains": "stm32cubemx"
+      }
+    ],
+    "type": "stm32-cube"
+  },
+  "projectTypes": [
+    {
+      "id": "stm32-cube",
+      "title": "STM32Cube 工程",
+      "icon": "stm32",
+      "description": "识别已有 STM32CubeMX 生成的 CMake 工程（此类型用于打开现有工程，非新建）"
+    },
+    {
+      "id": "stm32-bare-f103",
+      "title": "STM32 裸机 F103C8T6（蓝药丸）",
+      "icon": "stm32",
+      "description": "裸机 CMSIS 模板：直接操作寄存器，无 HAL。板载 LED: PC13",
+      "capabilities": [
+        "compile",
+        "upload",
+        "flash"
+      ],
+      "scaffold": [
+        {
+          "file": "CMakeLists.txt",
+          "content": "cmake_minimum_required(VERSION 3.20)\nproject({name} C ASM)\n\n# 裸机 STM32 工程（TrieCode STM32Cube 工具链脚手架 · STM32F103C8T6）\nset(CMAKE_C_STANDARD 11)\nset(CMAKE_C_STANDARD_REQUIRED ON)\nset(CMAKE_EXECUTABLE_SUFFIX \".elf\")\n\n# 器件支持目录：创建项目时由插件注入（{pluginDir} → 插件安装目录）\nset(STM32_DEVICE_DIR \"{pluginDir}/device-support/f1\")\n# 规范化反斜杠（Windows 插件目录路径），避免 CMake 字符串转义报错\nfile(TO_CMAKE_PATH \"${STM32_DEVICE_DIR}\" STM32_DEVICE_DIR)\nif(NOT EXISTS \"${STM32_DEVICE_DIR}\")\n  message(FATAL_ERROR \"STM32 器件支持目录不存在: ${STM32_DEVICE_DIR}\\n请重新安装「STM32Cube 工具链」插件后重新创建项目\")\nendif()\n\nadd_executable(${PROJECT_NAME}\n  Core/Src/main.c\n  ${STM32_DEVICE_DIR}/system_stm32f1xx.c\n  ${STM32_DEVICE_DIR}/startup_stm32f103xb.s\n)\n\ntarget_compile_definitions(${PROJECT_NAME} PRIVATE STM32F103xB)\ntarget_include_directories(${PROJECT_NAME} PRIVATE Core/Inc ${STM32_DEVICE_DIR}/include ${STM32_DEVICE_DIR}/../common/cmsis)\n\n# Cortex-M3：核心编译/链接参数（编译器路径由工具链文件 + PATH 注入提供）\ntarget_compile_options(${PROJECT_NAME} PRIVATE -mcpu=cortex-m3 -mthumb -ffunction-sections -fdata-sections)\ntarget_link_options(${PROJECT_NAME} PRIVATE\n  -mcpu=cortex-m3 -mthumb\n  -T${STM32_DEVICE_DIR}/stm32f103xb_flash.ld\n  --specs=nosys.specs\n  -Wl,--gc-sections\n)\n\n# 生成 .hex / .bin（烧录用）\nadd_custom_command(TARGET ${PROJECT_NAME} POST_BUILD\n  COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${PROJECT_NAME}> ${PROJECT_NAME}.hex\n  COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${PROJECT_NAME}> ${PROJECT_NAME}.bin\n)\n"
+        },
+        {
+          "file": "cmake/gcc-arm-none-eabi.cmake",
+          "content": "# STM32CubeCLT GNU Arm 工具链（TrieCode STM32Cube 工具链脚手架）\n# 编译器经 PATH 注入解析（裸工具名，Windows 自动补 .exe）\nset(CMAKE_SYSTEM_NAME Generic)\nset(CMAKE_SYSTEM_PROCESSOR arm)\nset(CMAKE_C_COMPILER arm-none-eabi-gcc)\nset(CMAKE_ASM_COMPILER arm-none-eabi-gcc)\nset(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)\n"
+        },
+        {
+          "file": "Core/Src/main.c",
+          "content": "/* {name} — STM32F103C8T6 裸机模板（蓝药丸板载 LED: PC13，低电平点亮） */\n#include \"stm32f1xx.h\"\n\nstatic void delay_loop(volatile uint32_t n) { while (n--) { __asm volatile(\"nop\"); } }\n\nint main(void) {\n  /* 使能 GPIOC 时钟 */\n  RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;\n  /* PC13 = 推挽输出（CNF=01 通用推挽 / MODE=10 2MHz） */\n  GPIOC->CRH = (GPIOC->CRH & ~(uint32_t)0xF0) | 0x20;\n\n  for (;;) {\n    GPIOC->BRR = (1U << 13);   /* 低电平 → 亮 */\n    delay_loop(2000000);\n    GPIOC->BSRR = (1U << 13);  /* 高电平 → 灭 */\n    delay_loop(2000000);\n  }\n}\n"
+        },
+        {
+          "file": ".gitignore",
+          "content": "build/\n"
+        }
+      ]
+    },
+    {
+      "id": "stm32-bare-f401",
+      "title": "STM32 裸机 F401CCU6（黑药丸）",
+      "icon": "stm32",
+      "description": "裸机 CMSIS 模板：直接操作寄存器，无 HAL。板载 LED: PC13",
+      "capabilities": [
+        "compile",
+        "upload",
+        "flash"
+      ],
+      "scaffold": [
+        {
+          "file": "CMakeLists.txt",
+          "content": "cmake_minimum_required(VERSION 3.20)\nproject({name} C ASM)\n\n# 裸机 STM32 工程（TrieCode STM32Cube 工具链脚手架 · STM32F401CCU6）\nset(CMAKE_C_STANDARD 11)\nset(CMAKE_C_STANDARD_REQUIRED ON)\nset(CMAKE_EXECUTABLE_SUFFIX \".elf\")\n\n# 器件支持目录：创建项目时由插件注入（{pluginDir} → 插件安装目录）\nset(STM32_DEVICE_DIR \"{pluginDir}/device-support/f4\")\n# 规范化反斜杠（Windows 插件目录路径），避免 CMake 字符串转义报错\nfile(TO_CMAKE_PATH \"${STM32_DEVICE_DIR}\" STM32_DEVICE_DIR)\nif(NOT EXISTS \"${STM32_DEVICE_DIR}\")\n  message(FATAL_ERROR \"STM32 器件支持目录不存在: ${STM32_DEVICE_DIR}\\n请重新安装「STM32Cube 工具链」插件后重新创建项目\")\nendif()\n\nadd_executable(${PROJECT_NAME}\n  Core/Src/main.c\n  ${STM32_DEVICE_DIR}/system_stm32f4xx.c\n  ${STM32_DEVICE_DIR}/startup_stm32f401xc.s\n)\n\ntarget_compile_definitions(${PROJECT_NAME} PRIVATE STM32F401xC)\ntarget_include_directories(${PROJECT_NAME} PRIVATE Core/Inc ${STM32_DEVICE_DIR}/include ${STM32_DEVICE_DIR}/../common/cmsis)\n\n# Cortex-M4F：核心编译/链接参数（带硬件浮点）\ntarget_compile_options(${PROJECT_NAME} PRIVATE -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -ffunction-sections -fdata-sections)\ntarget_link_options(${PROJECT_NAME} PRIVATE\n  -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard\n  -T${STM32_DEVICE_DIR}/stm32f401ccux_flash.ld\n  --specs=nosys.specs\n  -Wl,--gc-sections\n)\n\n# 生成 .hex / .bin（烧录用）\nadd_custom_command(TARGET ${PROJECT_NAME} POST_BUILD\n  COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${PROJECT_NAME}> ${PROJECT_NAME}.hex\n  COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${PROJECT_NAME}> ${PROJECT_NAME}.bin\n)\n"
+        },
+        {
+          "file": "cmake/gcc-arm-none-eabi.cmake",
+          "content": "# STM32CubeCLT GNU Arm 工具链（TrieCode STM32Cube 工具链脚手架）\n# 编译器经 PATH 注入解析（裸工具名，Windows 自动补 .exe）\nset(CMAKE_SYSTEM_NAME Generic)\nset(CMAKE_SYSTEM_PROCESSOR arm)\nset(CMAKE_C_COMPILER arm-none-eabi-gcc)\nset(CMAKE_ASM_COMPILER arm-none-eabi-gcc)\nset(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)\n"
+        },
+        {
+          "file": "Core/Src/main.c",
+          "content": "/* {name} — STM32F401CCU6 裸机模板（黑药丸板载 LED: PC13，低电平点亮） */\n#include \"stm32f4xx.h\"\n\nstatic void delay_loop(volatile uint32_t n) { while (n--) { __asm volatile(\"nop\"); } }\n\nint main(void) {\n  /* 使能 GPIOC 时钟（F4 外设时钟在 AHB1） */\n  RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;\n  /* PC13 = 输出 */\n  GPIOC->MODER = (GPIOC->MODER & ~(3U << 26)) | (1U << 26);\n\n  for (;;) {\n    GPIOC->BSRR = (1U << 13);   /* 低电平 → 亮 */\n    delay_loop(1500000);\n    GPIOC->BSRR = (1U << 29);   /* 高电平 → 灭 */\n    delay_loop(1500000);\n  }\n}\n"
+        },
+        {
+          "file": ".gitignore",
+          "content": "build/\n"
+        }
+      ]
+    },
+    {
+      "id": "stm32-bare-f411",
+      "title": "STM32 裸机 F411CEU6（黑药丸）",
+      "icon": "stm32",
+      "description": "裸机 CMSIS 模板：直接操作寄存器，无 HAL。板载 LED: PC13",
+      "capabilities": [
+        "compile",
+        "upload",
+        "flash"
+      ],
+      "scaffold": [
+        {
+          "file": "CMakeLists.txt",
+          "content": "cmake_minimum_required(VERSION 3.20)\nproject({name} C ASM)\n\n# 裸机 STM32 工程（TrieCode STM32Cube 工具链脚手架 · STM32F411CEU6）\nset(CMAKE_C_STANDARD 11)\nset(CMAKE_C_STANDARD_REQUIRED ON)\nset(CMAKE_EXECUTABLE_SUFFIX \".elf\")\n\n# 器件支持目录：创建项目时由插件注入（{pluginDir} → 插件安装目录）\nset(STM32_DEVICE_DIR \"{pluginDir}/device-support/f4\")\n# 规范化反斜杠（Windows 插件目录路径），避免 CMake 字符串转义报错\nfile(TO_CMAKE_PATH \"${STM32_DEVICE_DIR}\" STM32_DEVICE_DIR)\nif(NOT EXISTS \"${STM32_DEVICE_DIR}\")\n  message(FATAL_ERROR \"STM32 器件支持目录不存在: ${STM32_DEVICE_DIR}\\n请重新安装「STM32Cube 工具链」插件后重新创建项目\")\nendif()\n\nadd_executable(${PROJECT_NAME}\n  Core/Src/main.c\n  ${STM32_DEVICE_DIR}/system_stm32f4xx.c\n  ${STM32_DEVICE_DIR}/startup_stm32f411xe.s\n)\n\ntarget_compile_definitions(${PROJECT_NAME} PRIVATE STM32F411xE)\ntarget_include_directories(${PROJECT_NAME} PRIVATE Core/Inc ${STM32_DEVICE_DIR}/include ${STM32_DEVICE_DIR}/../common/cmsis)\n\n# Cortex-M4F：核心编译/链接参数（带硬件浮点）\ntarget_compile_options(${PROJECT_NAME} PRIVATE -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -ffunction-sections -fdata-sections)\ntarget_link_options(${PROJECT_NAME} PRIVATE\n  -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard\n  -T${STM32_DEVICE_DIR}/stm32f411ceux_flash.ld\n  --specs=nosys.specs\n  -Wl,--gc-sections\n)\n\n# 生成 .hex / .bin（烧录用）\nadd_custom_command(TARGET ${PROJECT_NAME} POST_BUILD\n  COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${PROJECT_NAME}> ${PROJECT_NAME}.hex\n  COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${PROJECT_NAME}> ${PROJECT_NAME}.bin\n)\n"
+        },
+        {
+          "file": "cmake/gcc-arm-none-eabi.cmake",
+          "content": "# STM32CubeCLT GNU Arm 工具链（TrieCode STM32Cube 工具链脚手架）\n# 编译器经 PATH 注入解析（裸工具名，Windows 自动补 .exe）\nset(CMAKE_SYSTEM_NAME Generic)\nset(CMAKE_SYSTEM_PROCESSOR arm)\nset(CMAKE_C_COMPILER arm-none-eabi-gcc)\nset(CMAKE_ASM_COMPILER arm-none-eabi-gcc)\nset(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)\n"
+        },
+        {
+          "file": "Core/Src/main.c",
+          "content": "/* {name} — STM32F411CEU6 裸机模板（黑药丸板载 LED: PC13，低电平点亮） */\n#include \"stm32f4xx.h\"\n\nstatic void delay_loop(volatile uint32_t n) { while (n--) { __asm volatile(\"nop\"); } }\n\nint main(void) {\n  /* 使能 GPIOC 时钟（F4 外设时钟在 AHB1） */\n  RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;\n  /* PC13 = 输出 */\n  GPIOC->MODER = (GPIOC->MODER & ~(3U << 26)) | (1U << 26);\n\n  for (;;) {\n    GPIOC->BSRR = (1U << 13);   /* 低电平 → 亮 */\n    delay_loop(1500000);\n    GPIOC->BSRR = (1U << 29);   /* 高电平 → 灭 */\n    delay_loop(1500000);\n  }\n}\n"
+        },
+        {
+          "file": ".gitignore",
+          "content": "build/\n"
+        }
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "name": "configure",
+      "description": "重新运行 CMake 配置（改 CMakeLists.txt 后需重跑；等效于配置步骤）。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "stm32-cube",
+        "stm32-bare-f103",
+        "stm32-bare-f401",
+        "stm32-bare-f411"
+      ],
+      "category": "execute",
+      "cli": {
+        "command": [
+          "cmake",
+          "-S",
+          "{projectPath}",
+          "-B",
+          "{projectPath}/build",
+          "-G",
+          "Ninja",
+          "-DCMAKE_TOOLCHAIN_FILE={projectPath}/cmake/gcc-arm-none-eabi.cmake",
+          "-DCMAKE_BUILD_TYPE=Debug"
+        ],
+        "cwd": "{projectPath}",
+        "env": {
+          "PATH": "{settings.toolchain.active.path}/CMake/bin{pathSeparator}{settings.toolchain.active.path}/Ninja/bin{pathSeparator}{settings.toolchain.active.path}/GNU-tools-for-STM32/bin{pathSeparator}{env.PATH}"
+        },
+        "timeoutMs": 300000,
+        "maxOutput": 12000,
+        "stream": true,
+        "streamChannel": "compile:onOutput"
+      }
+    },
+    {
+      "name": "build",
+      "description": "编译当前 STM32 工程（CMake 配置 + 构建）。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "stm32-cube",
+        "stm32-bare-f103",
+        "stm32-bare-f401",
+        "stm32-bare-f411"
+      ],
+      "category": "execute",
+      "cli": {
+        "steps": [
+          {
+            "command": [
+              "cmake",
+              "-S",
+              "{projectPath}",
+              "-B",
+              "{projectPath}/build",
+              "-G",
+              "Ninja",
+              "-DCMAKE_TOOLCHAIN_FILE={projectPath}/cmake/gcc-arm-none-eabi.cmake",
+              "-DCMAKE_BUILD_TYPE=Debug"
+            ],
+            "cwd": "{projectPath}"
+          },
+          {
+            "command": [
+              "cmake",
+              "--build",
+              "{projectPath}/build",
+              "--parallel"
+            ],
+            "cwd": "{projectPath}"
+          }
+        ],
+        "env": {
+          "PATH": "{settings.toolchain.active.path}/CMake/bin{pathSeparator}{settings.toolchain.active.path}/Ninja/bin{pathSeparator}{settings.toolchain.active.path}/GNU-tools-for-STM32/bin{pathSeparator}{env.PATH}"
+        },
+        "timeoutMs": 600000,
+        "maxOutput": 12000,
+        "stream": true,
+        "streamChannel": "compile:onOutput"
+      }
+    },
+    {
+      "name": "flash",
+      "description": "编译并烧录到板载 ST-Link（SWD，自动定位 build 产物：最新 .elf；STM32_Programmer_CLI）。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "stm32-cube",
+        "stm32-bare-f103",
+        "stm32-bare-f401",
+        "stm32-bare-f411"
+      ],
+      "category": "execute",
+      "cli": {
+        "steps": [
+          {
+            "command": [
+              "cmake",
+              "-S",
+              "{projectPath}",
+              "-B",
+              "{projectPath}/build",
+              "-G",
+              "Ninja",
+              "-DCMAKE_TOOLCHAIN_FILE={projectPath}/cmake/gcc-arm-none-eabi.cmake",
+              "-DCMAKE_BUILD_TYPE=Debug"
+            ],
+            "cwd": "{projectPath}"
+          },
+          {
+            "command": [
+              "cmake",
+              "--build",
+              "{projectPath}/build",
+              "--parallel"
+            ],
+            "cwd": "{projectPath}"
+          },
+          {
+            "command": [
+              "STM32_Programmer_CLI",
+              "-c",
+              "port=SWD",
+              "freq=4000",
+              "-w",
+              "{defaultArtifact}",
+              "-v",
+              "-rst"
+            ],
+            "cwd": "{projectPath}"
+          }
+        ],
+        "env": {
+          "PATH": "{settings.toolchain.active.path}/CMake/bin{pathSeparator}{settings.toolchain.active.path}/Ninja/bin{pathSeparator}{settings.toolchain.active.path}/GNU-tools-for-STM32/bin{pathSeparator}{settings.toolchain.active.path}/STM32CubeProgrammer/bin{pathSeparator}{env.PATH}"
+        },
+        "timeoutMs": 600000,
+        "maxOutput": 12000,
+        "stream": true,
+        "streamChannel": "compile:onOutput",
+        "pauseSerialPort": true
+      }
+    },
+    {
+      "name": "erase_flash",
+      "description": "全片擦除（不可逆；STM32_Programmer_CLI -e all）。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "stm32-cube",
+        "stm32-bare-f103",
+        "stm32-bare-f401",
+        "stm32-bare-f411"
+      ],
+      "category": "execute",
+      "cli": {
+        "command": [
+          "STM32_Programmer_CLI",
+          "-c",
+          "port=SWD",
+          "-e",
+          "all"
+        ],
+        "cwd": "{projectPath}",
+        "env": {
+          "PATH": "{settings.toolchain.active.path}/STM32CubeProgrammer/bin{pathSeparator}{env.PATH}"
+        },
+        "timeoutMs": 120000,
+        "pauseSerialPort": true
+      }
+    },
+    {
+      "name": "clean",
+      "description": "清理构建产物（cmake --build --target clean）。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "stm32-cube",
+        "stm32-bare-f103",
+        "stm32-bare-f401",
+        "stm32-bare-f411"
+      ],
+      "category": "execute",
+      "cli": {
+        "command": [
+          "cmake",
+          "--build",
+          "{projectPath}/build",
+          "--target",
+          "clean"
+        ],
+        "cwd": "{projectPath}",
+        "env": {
+          "PATH": "{settings.toolchain.active.path}/CMake/bin{pathSeparator}{settings.toolchain.active.path}/Ninja/bin{pathSeparator}{env.PATH}"
+        },
+        "timeoutMs": 120000
+      }
+    },
+    {
+      "name": "get_status",
+      "description": "STM32CubeCLT 检测状态（路径/是否就绪）。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "stm32-cube",
+        "stm32-bare-f103",
+        "stm32-bare-f401",
+        "stm32-bare-f411"
+      ],
+      "category": "query",
+      "internal": {
+        "service": "toolchain",
+        "method": "status"
+      }
+    },
+    {
+      "name": "get_size",
+      "description": "查看固件体积（arm-none-eabi-size，Flash/RAM 用量；定位 build 产物：最新 .elf）。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "stm32-cube",
+        "stm32-bare-f103",
+        "stm32-bare-f401",
+        "stm32-bare-f411"
+      ],
+      "category": "query",
+      "cli": {
+        "command": [
+          "arm-none-eabi-size",
+          "{defaultArtifact}"
+        ],
+        "cwd": "{projectPath}",
+        "env": {
+          "PATH": "{settings.toolchain.active.path}/GNU-tools-for-STM32/bin{pathSeparator}{env.PATH}"
+        },
+        "timeoutMs": 30000
+      }
+    },
+    {
+      "name": "serial_monitor_open",
+      "description": "打开后台串口日志（默认 115200）。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "port": {
+            "type": "string"
+          },
+          "baud": {
+            "type": "integer"
+          }
+        }
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "stm32-cube",
+        "stm32-bare-f103",
+        "stm32-bare-f401",
+        "stm32-bare-f411"
+      ],
+      "category": "execute",
+      "internal": {
+        "service": "serialLog",
+        "method": "open"
+      }
+    },
+    {
+      "name": "serial_monitor_tail",
+      "description": "读取最近串口日志。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "port": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          }
+        }
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "stm32-cube",
+        "stm32-bare-f103",
+        "stm32-bare-f401",
+        "stm32-bare-f411"
+      ],
+      "category": "query",
+      "internal": {
+        "service": "serialLog",
+        "method": "tail"
+      }
+    },
+    {
+      "name": "serial_monitor_grep",
+      "description": "检索串口日志关键字。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string"
+          },
+          "max": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pattern"
+        ]
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "stm32-cube",
+        "stm32-bare-f103",
+        "stm32-bare-f401",
+        "stm32-bare-f411"
+      ],
+      "category": "query",
+      "internal": {
+        "service": "serialLog",
+        "method": "grep"
+      }
+    },
+    {
+      "name": "serial_monitor_send",
+      "description": "向串口发送数据。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "stm32-cube",
+        "stm32-bare-f103",
+        "stm32-bare-f401",
+        "stm32-bare-f411"
+      ],
+      "category": "execute",
+      "internal": {
+        "service": "serialLog",
+        "method": "send"
+      }
+    },
+    {
+      "name": "serial_monitor_close",
+      "description": "关闭后台串口日志。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "port": {
+            "type": "string"
+          }
+        }
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "stm32-cube",
+        "stm32-bare-f103",
+        "stm32-bare-f401",
+        "stm32-bare-f411"
+      ],
+      "category": "execute",
+      "internal": {
+        "service": "serialLog",
+        "method": "close"
+      }
+    }
+  ],
+  "skills": [
+    {
+      "name": "STM32 烧录前检查",
+      "description": "编译 + 检查工具链/产物后再烧录",
+      "prompt": "1. 用 plugin_stm32-cube-toolchain_get_status 确认 STM32CubeCLT 已检测、项目已绑定 STM32 工具链\n2. read_file 当前项目 {sketchName} 的 Core/Src/main.c 等源码，检查明显错误\n3. 用 plugin_stm32-cube-toolchain_build 编译，确保无 error\n4. 向用户确认后，用 plugin_stm32-cube-toolchain_flash 烧录（SWD）\n5. 烧录后用 serial_monitor_open/serial_monitor_tail 确认启动正常"
+    },
+    {
+      "name": "STM32 串口日志分析",
+      "description": "后台串口日志读取与检索",
+      "prompt": "1. 用 serial_monitor_open 打开当前串口（{port}，115200）\n2. 用 serial_monitor_tail 读取最近日志，serial_monitor_grep 检索 error/assert/Backtrace 等\n3. 结合 STM32 输出分析问题根因（HardFault 常伴 Backtrace）\n4. 完成后 serial_monitor_close 释放串口"
+    }
+  ],
+  "views": [
+    {
+      "id": "status",
+      "title": "工具链状态",
+      "icon": "stm32",
+      "slot": "sidebar",
+      "type": "webview",
+      "entry": "ui/status.html",
+      "events": [
+        "toolchain:statusChanged",
+        "pluginSettings:stm32-cube-toolchain:changed"
+      ]
+    }
+  ],
+  "commands": [],
+  "dependencies": [],
+  "activation": {
+    "projectTypes": [
+      "stm32-cube",
+      "stm32-bare-f103",
+      "stm32-bare-f401",
+      "stm32-bare-f411"
+    ]
+  }
+}

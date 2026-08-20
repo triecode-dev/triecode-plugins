@@ -1,0 +1,36 @@
+# ── 通用排除 ─────────────────────────────────────────
+node_modules/
+*.log
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+
+# ── 构建产物（开源仓库只发源码，不发布产物）──────────
+# 注意：`dist/` 排除——但易创EDA 的 extension/build/packaged.ts 是「打包脚本源码」需保留，
+# 因此这里只排除真正的时间构建产物目录（server/dist、extension/dist），并显式允许 build/*.ts 源码。
+dist/
+server/dist/
+extension/dist/
+easyeda-toolchain/extension/dist/
+*.zip
+*.eext
+*.tgz
+
+# ── 本地 / 临时 ─────────────────────────────────────
+*.tmp
+.tmp/
+.env
+.env.*
+!.env.example
+
+# ── 密钥/凭据（红线：绝不进入开源仓库）─────────────
+secrets-inventory.md
+credentials/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# ── IDE ─────────────────────────────────────────────
+.idea/
+.vscode/

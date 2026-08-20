@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>ESP-IDF 配置</title>
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; padding: 12px; color: #1f2937; background: #fff; font-size: 12px; overflow-x: hidden; }
+  .toolbar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; min-width: 0; }
+  /* min-width:0 让搜索框优先收缩让位；按钮 flex-shrink:0 + nowrap 面板拖窄时不压缩不换行 */
+  input[type=text] { flex: 1 1 auto; min-width: 0; font-size: 12px; padding: 5px 8px; border: 1px solid #d1d5db; border-radius: 6px; }
+  .menu { border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 6px; overflow: hidden; }
+  .menu > .mhead { padding: 7px 10px; cursor: pointer; background: #f9fafb; font-weight: 600; display: flex; justify-content: space-between; }
+  .menu > .mhead .cnt { color: #9ca3af; font-weight: 400; }
+  .menu > .mbody { padding: 4px 8px; border-top: 1px solid #f3f4f6; }
+  .sym { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 4px; border-bottom: 1px solid #fafafa; }
+  .sym:last-child { border-bottom: none; }
+  .sym .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sym .title small { display: block; color: #9ca3af; }
+  .sym select, .sym input[type=number], .sym input[type=text] { font-size: 12px; padding: 3px 6px; border: 1px solid #d1d5db; border-radius: 5px; max-width: 150px; }
+  .loading { color: #6b7280; line-height: 1.7; }
+  .guide { color: #6b7280; line-height: 1.6; }
+  .saved { color: #9ca3af; font-size: 11px; }
+  button { font-size: 12px; padding: 4px 12px; border-radius: 6px; border: 1px solid #2563eb; background: #2563eb; color: #fff; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
+  button.ghost { background: #fff; color: #2563eb; }
+  button:disabled { opacity: .5; cursor: default; }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <input id="q" type="text" placeholder="搜索配置项…" />
+    <button id="reloadBtn" class="ghost">刷新</button>
+    <button id="saveBtn" disabled>保存</button>
+  </div>
+  <div id="body" class="loading">加载中…</div>
+
+  <script>
+    var PLUGIN = 'espressif-idf-toolchain';
+    var nextId = 1, pending = {};
+    function send(method, args) { return new Promise(function (resolve, reject) { var id = 'm' + (nextId++); pending[id] = { resolve: resolve, reject: reject }; window.parent.postMessage({ type: 'host.invoke', id: id, method: method, args: args || {} }, '*'); }); }
+    function backend(method, params, timeoutMs) { return send('backend:invoke', { pluginId: PLUGIN, backendId: 'confserver', method: method, params: params || {}, timeoutMs: timeoutMs }).then(function (r) { if (!r || r.ok === false) throw new Error(r && r.error || 'confserver 错误'); return r.data; }); }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+    window.addEventListener('message', function (e) {
+      var d = e.data;
+      if (!d || typeof d !== 'object') return;
+      if (d.type === 'host.invoke.result') { var p = pending[d.id]; if (!p) return; delete pending[d.id]; if (d.ok) p.resolve(d.data); else p.reject(new Error(d.error || 'unknown')); }
+      // 工具链状态 / 插件设置变化（如编译后 sdkconfig 更新）→ 自动重新加载配置树
+      else if (d.type === 'state.push' && (d.key === 'pluginSettings:' + PLUGIN + ':changed' || d.key === 'toolchain:statusChanged')) { load(); }
+    });
+    window.parent.postMessage({ type: 'ready' }, '*');
+    window.parent.postMessage({ type: 'state.subscribe', events: ['pluginSettings:' + PLUGIN + ':changed', 'toolchain:statusChanged'] }, '*');
+
+    // kconfserver 横幅整树 {values:{裸符号:值}, visible, ranges} → 按前缀分组的扁平列表
+    // 值类型推断：boolean→bool 开关、number→数字输入、string→文本输入
+    function normalize(raw) {
+      var values = (raw && raw.values) || {};
+      var flat = Object.keys(values).map(function (id) {
+        var v = values[id];
+        var type = (typeof v === 'boolean') ? 'bool' : (typeof v === 'number') ? 'int' : 'string';
+        return { id: id, title: id, type: type, value: v };
+      });
+      var groups = {};
+      flat.forEach(function (s) {
+        var bare = s.id.indexOf('CONFIG_') === 0 ? s.id.slice(7) : s.id;
+        var g = bare.split('_')[0] || '其他';
+        (groups[g] = groups[g] || []).push(s);
+      });
+      var menus = Object.keys(groups).sort().map(function (g) { return { title: g, symbols: groups[g] }; });
+      return { menus: menus, flat: flat };
+    }
+    function bare(name) { return String(name || '').replace(/^CONFIG_/, ''); }
+
+    var state = { menus: [], flat: [], query: '' };
+    var dirty = false;
+
+    function render() {
+      var body = document.getElementById('body');
+      var q = state.query.trim().toLowerCase();
+      var show = q ? state.flat.filter(function (s) { return String(s.id).toLowerCase().indexOf(q) >= 0; }).slice(0, 200) : null;
+      var html = '';
+      if (show) {
+        html = show.map(symHtml).join('') || '<div class="loading">无匹配</div>';
+      } else {
+        state.menus.forEach(function (m) {
+          if (!m.symbols.length) return;
+          html += '<div class="menu"><div class="mhead">' + esc(m.title) + '<span class="cnt">' + m.symbols.length + '</span></div><div class="mbody">' + m.symbols.map(symHtml).join('') + '</div></div>';
+        });
+      }
+      body.innerHTML = html || '<div class="loading">配置为空。请先 set-target + 编译一次生成 sdkconfig 后重开。</div>';
+      document.getElementById('saveBtn').disabled = !dirty;
+      document.getElementById('saveBtn').textContent = dirty ? '● 保存' : '保存';
+    }
+    function symHtml(s) {
+      var c = '<div class="sym"><span class="title">' + esc(s.title) + '<small>' + esc(bare(s.id)) + '</small></span>';
+      if (s.type === 'bool') {
+        var on = s.value === true || s.value === 'y';
+        c += '<label><input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="setVal(\'' + esc(s.id) + '\', this.checked)" /> ' + (on ? '启用' : '关闭') + '</label>';
+      } else if (s.type === 'int') {
+        c += '<input type="number" value="' + esc(s.value) + '" onchange="setVal(\'' + esc(s.id) + '\', Number(this.value))" />';
+      } else {
+        c += '<input type="text" value="' + esc(s.value) + '" onchange="setVal(\'' + esc(s.id) + '\', this.value)" />';
+      }
+      return c + '</div>';
+    }
+
+    function setVal(id, val) {
+      backend('set_values', { values: { [bare(id)]: val } }).then(function () {
+        dirty = true;
+        // 同步本地显示值
+        for (var i = 0; i < state.flat.length; i++) if (state.flat[i].id === id) { state.flat[i].value = val; break; }
+        render();
+      }).catch(function (e) { alert('设置失败: ' + e.message); });
+    }
+    function save() {
+      backend('save', {}).then(function () { dirty = false; render(); }).catch(function (e) { alert('保存失败: ' + e.message); });
+    }
+    document.getElementById('saveBtn').onclick = save;
+    document.getElementById('q').addEventListener('input', function (e) { state.query = e.target.value; render(); });
+
+    function load() {
+      var body = document.getElementById('body');
+      body.className = 'loading';
+      body.textContent = '正在加载配置（首次会执行 cmake configure，可能需 30-60 秒）…';
+      // init 超时给足 120s（confserver 首次启动要 cmake configure，默认 15s 会超时返回空树 →「配置为空」）
+      backend('init', {}, 120000).then(function (raw) {
+        var s = normalize(raw);
+        state.menus = s.menus; state.flat = s.flat;
+        render();
+      }).catch(function (e) {
+        body.className = 'guide';
+        body.innerHTML = '加载配置失败：' + esc(e.message) + '<br>请确认：<br>1) 已在设备面板选择目标芯片并点「应用目标芯片」<br>2) 已编译过一次生成 sdkconfig（工具栏「编译」）<br>3) ESP-IDF 已检测（见「目标与工具链」视图）<br><br><button onclick="load()">重试加载</button>';
+      });
+    }
+    document.getElementById('reloadBtn').onclick = load;
+    load();
+  </script>
+</body>
+</html>

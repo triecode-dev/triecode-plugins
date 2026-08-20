@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Wokwi 模拟器 · 状态</title>
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; padding: 14px; color: #1f2937; background: #fff; font-size: 12px; overflow-x: hidden; }
+  .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 4px 0; }
+  .lbl { color: #6b7280; flex-shrink: 0; white-space: nowrap; }
+  .val { color: #111827; word-break: break-all; text-align: right; flex: 1 1 auto; min-width: 0; }
+  .ok { color: #16a34a; font-weight: 600; }
+  .err { color: #dc2626; }
+  .warn { color: #b45309; }
+  .guide { color: #6b7280; line-height: 1.7; }
+  button { font-size: 12px; padding: 5px 12px; border-radius: 6px; border: 1px solid #2563eb; background: #2563eb; color: #fff; cursor: pointer; margin: 4px 6px 0 0; }
+  button.ghost { background: #fff; color: #2563eb; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+</style>
+</head>
+<body>
+  <div id="body">加载中…</div>
+
+  <script>
+    var nextId = 1, pending = {};
+    function send(method, args) {
+      return new Promise(function (resolve, reject) {
+        var id = 'm' + (nextId++);
+        pending[id] = { resolve: resolve, reject: reject };
+        window.parent.postMessage({ type: 'host.invoke', id: id, method: method, args: args || {} }, '*');
+      });
+    }
+    var PLUGIN = 'wokwi-simulator';
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function row(l, v) { return '<div class="row"><span class="lbl">' + esc(l) + '</span><span class="val">' + esc(v) + '</span></div>'; }
+
+    window.addEventListener('message', function (e) {
+      var d = e.data;
+      if (!d || typeof d !== 'object') return;
+      if (d.type === 'host.invoke.result') { var p = pending[d.id]; if (!p) return; delete pending[d.id]; if (d.ok) p.resolve(d.data); else p.reject(new Error(d.error || 'unknown')); }
+      else if (d.type === 'state.push' && d.key === 'toolchain:statusChanged' && d.value && d.value.pluginId === PLUGIN) render(d.value);
+    });
+    window.parent.postMessage({ type: 'ready' }, '*');
+    window.parent.postMessage({ type: 'state.subscribe', events: ['toolchain:statusChanged'] }, '*');
+
+    function render(st) {
+      var el = document.getElementById('body');
+      if (!st || !st.detected || !st.active) {
+        el.innerHTML =
+          '<div class="card guide">未检测到 wokwi-cli。<br>· 安装到 <code>D:\\Wokwi\\bin</code>、<code>%USERPROFILE%\\wokwi\\bin</code> 等常见位置后点「重新检测」<br>· 或设 <code>WOKWI_CLI_PATH</code> 环境变量指向其所在目录</div>' +
+          '<button id="detectBtn">重新检测</button>' +
+          (st && st.error ? '<div class="err" style="margin-top:6px">' + esc(st.error) + '</div>' : '') +
+          '<div class="card guide" style="margin-top:10px"><b>使用流程</b><br>1. 新建 Wokwi 项目（脚手架含 main.ino + diagram.json + wokwi.toml）<br>2. 工具栏「运行模拟」或 AI 用 wokwi_lint / wokwi_compile_arduino / wokwi_run<br>3. 「串口输出」视图看实时串口；wokwi_ci_test / wokwi_scenario 做自动化断言<br>4. 未配置 token 时模拟会失败——在设置页「Wokwi 配置」填 WOKWI_CLI_TOKEN</div>';
+        var d = document.getElementById('detectBtn'); if (d) d.onclick = detect;
+        return;
+      }
+      var a = st.active;
+      el.innerHTML =
+        '<div class="card"><b class="ok">✓ 已检测到 wokwi-cli</b>' +
+        row('版本', a.version || '—') +
+        row('目录', a.path) +
+        row('来源', a.source || '—') +
+        '</div>' +
+        '<button class="ghost" id="detectBtn2">重新检测</button>' +
+        '<div class="card guide" style="margin-top:10px"><b>使用流程</b><br>1. 新建 Wokwi 项目（脚手架含 main.ino + diagram.json + wokwi.toml）<br>2. 工具栏「运行模拟」或 AI 用 wokwi_lint / wokwi_compile_arduino / wokwi_run<br>3. 「串口输出」视图看实时串口；wokwi_ci_test / wokwi_scenario 做自动化断言<br>4. 未配置 token 时模拟会失败——在设置页「Wokwi 配置」填 WOKWI_CLI_TOKEN</div>';
+      var d2 = document.getElementById('detectBtn2'); if (d2) d2.onclick = detect;
+    }
+    function detect() { document.getElementById('body').innerHTML = '检测中…'; send('toolchain:detect', { pluginId: PLUGIN }).then(function () { /* 状态由 toolchain:statusChanged 推送刷新 */ }).catch(function (e) { document.getElementById('body').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; }); }
+    setTimeout(function () { /* 初始拉取一次状态（webview 可能晚于广播） */ send('toolchain:status', { pluginId: PLUGIN }).then(function (s) { if (s) render(s); }).catch(function () {}); }, 300);
+  </script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+TrieCode Plugins
+================
+Apache License 2.0
+
+Copyright (c) 2026 Zhengzhou Xinxian Intelligent Technology Co., Ltd.
+（郑州芯弦智能技术有限公司）
+
+This product includes software developed by the TrieCode team.
+
+Third-party components and their licenses:
+
+1. easyeda-toolchain
+   - Fork of JLCEDA official `run-api-gateway` (Apache-2.0).
+     Original copyright: Copyright [2024] JLCEDA <support@lceda.cn>
+     See easyeda-toolchain/extension/NOTICE for the full modifications list.
+
+2. stm32-cube-toolchain
+   - Device support files (CMSIS headers, STM32 device headers, startup files,
+     linker scripts) are based on STMicroelectronics material.
+     See stm32-cube-toolchain/device-support/LICENSE for source and license terms.
+
+3. browser-toolchain
+   - Wraps @playwright/mcp (Apache-2.0) and downloads a portable Node.js runtime
+     when no system Node (>=18) is available. See browser-toolchain/plugin.json
+     for the exact dependency URL.
+
+4. esp-idf-toolchain
+   - Bridges the ESP-IDF toolchain via the host's command driver; no third-party
+     source files are bundled.
+
+Trademarks: "TrieCode" is a product name of Zhengzhou Xinxian Intelligent
+Technology Co., Ltd. The names of EasyEDA / JLCEDA / STMicroelectronics /
+Espressif / Wokwi etc. are trademarks of their respective owners and are used
+only in descriptive references.

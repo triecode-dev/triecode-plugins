@@ -1,0 +1,401 @@
+{
+  "id": "wokwi-simulator",
+  "name": "Wokwi 模拟器",
+  "version": "0.1.3",
+  "description": "Wokwi 嵌入式电路模拟器：用 wokwi-cli 在本地/云端仿真引擎上运行 Arduino/ESP32/STM32 等固件，串口输出实时可测、自动化场景断言、电路图校验、截图。",
+  "developer": "TrieCode",
+  "icon": "wokwi",
+  "category": "simulator",
+  "activation": {
+    "projectTypes": [
+      "wokwi"
+    ]
+  },
+  "projectTypes": [
+    {
+      "id": "wokwi",
+      "title": "Wokwi 模拟项目",
+      "icon": "wokwi",
+      "description": "Wokwi 仿真项目：Arduino 固件（.ino）+ 电路图（diagram.json）+ 仿真配置（wokwi.toml）——编译固件后可本地模拟运行，串口输出实时回传",
+      "scaffold": [
+        {
+          "file": "{name}.ino",
+          "content": "// Wokwi 模拟项目（Arduino Uno）——电路见 diagram.json：数字 13 引脚经 330Ω 电阻接红色 LED。\n// 程序让 LED 闪烁，并在串口打印状态（wokwi_run 可捕获这些输出验证行为）。\nvoid setup() {\n  pinMode(13, OUTPUT);\n  Serial.begin(9600);\n  Serial.println(\"Wokwi simulation started!\");\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  Serial.println(\"LED ON\");\n  delay(500);\n  digitalWrite(13, LOW);\n  Serial.println(\"LED OFF\");\n  delay(500);\n}\n"
+        },
+        {
+          "file": "wokwi.toml",
+          "content": "# Wokwi 项目配置：编译固件路径（wokwi_compile_arduino 或 arduino-cli 生成到 build/）\n# 也可改为指向已存在的固件（ESP32 用 build/flasher_args.json、PlatformIO 用 .hex/.elf 等）\n[wokwi]\nversion = 1\nfirmware = 'build/{name}.ino.hex'\nelf = 'build/{name}.ino.elf'\n"
+        },
+        {
+          "file": "diagram.json",
+          "content": "{\n  \"version\": 1,\n  \"author\": \"TrieCode\",\n  \"editor\": \"wokwi\",\n  \"parts\": [\n    { \"id\": \"uno\", \"type\": \"wokwi-arduino-uno\", \"left\": 0, \"top\": 0, \"attrs\": {} },\n    { \"id\": \"r1\", \"type\": \"wokwi-resistor\", \"left\": 210, \"top\": 40, \"attrs\": {} },\n    { \"id\": \"led1\", \"type\": \"wokwi-led\", \"left\": 300, \"top\": 40, \"attrs\": { \"color\": \"red\" } }\n  ],\n  \"connections\": [\n    [\"uno:13\", \"r1:1\", \"green\", []],\n    [\"r1:2\", \"led1:A\", \"orange\", []],\n    [\"led1:C\", \"uno:GND.1\", \"black\", []]\n  ]\n}\n"
+        },
+        {
+          "file": "libraries.txt",
+          "content": "# Arduino 库依赖（每行一个库名，如 Servo / DHT sensor library）\n"
+        }
+      ]
+    }
+  ],
+  "detection": {
+    "envVars": [
+      "WOKWI_CLI_PATH"
+    ],
+    "pathGlobs": [
+      "D:/Wokwi/bin",
+      "%USERPROFILE%/wokwi/bin",
+      "C:/wokwi/bin",
+      "%LOCALAPPDATA%/Programs/wokwi"
+    ],
+    "validateFile": "wokwi-cli.exe"
+  },
+  "settings": [
+    {
+      "id": "wokwi",
+      "title": "Wokwi 配置",
+      "settings": [
+        {
+          "key": "wokwi.token",
+          "title": "WOKWI_CLI_TOKEN",
+          "description": "Wokwi CI token（https://wokwi.com/dashboard/ci 生成，wok_ 开头共 44 字符）。不配置时模拟会因无授权失败；此值作为 WOKWI_CLI_TOKEN 环境变量注入所有 wokwi 命令子进程。",
+          "type": "string",
+          "placeholder": "wok_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "restartRequired": false
+        }
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "name": "wokwi_lint",
+      "description": "Validate the Wokwi diagram.json of the current project for errors/warnings (unknown parts, invalid pin connections, missing components). Read-only, safe. Returns lint output.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "wokwi"
+      ],
+      "category": "query",
+      "cli": {
+        "command": [
+          "{settings.toolchain.active.path}/wokwi-cli.exe",
+          "lint",
+          "{projectPath}"
+        ],
+        "cwd": "{projectPath}",
+        "timeoutMs": 60000
+      }
+    },
+    {
+      "name": "wokwi_run",
+      "description": "Run the Wokwi simulation of the current project for `timeout` milliseconds. Uses the firmware path from wokwi.toml (compile first with wokwi_compile_arduino for Arduino projects). Streams the simulated serial output live. Exit code 42 = normal timeout end. Requires WOKWI_CLI_TOKEN configured.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "timeout": {
+            "type": "integer",
+            "description": "Simulation duration in milliseconds (default 30000)."
+          }
+        },
+        "required": [
+          "timeout"
+        ]
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "wokwi"
+      ],
+      "category": "execute",
+      "cli": {
+        "command": [
+          "{settings.toolchain.active.path}/wokwi-cli.exe",
+          "{projectPath}",
+          "--timeout",
+          "{timeout}"
+        ],
+        "cwd": "{projectPath}",
+        "env": {
+          "WOKWI_CLI_TOKEN": "{settings.wokwi.token}"
+        },
+        "timeoutMs": 120000,
+        "successCodes": [
+          0,
+          42
+        ],
+        "stream": true,
+        "streamChannel": "compile:onOutput"
+      }
+    },
+    {
+      "name": "wokwi_ci_test",
+      "description": "CI-style Wokwi test: run the simulation until `expectText` appears in serial output (pass) or `failText` appears (fail), bounded by `timeout`. Use to verify firmware behavior automatically. Returns the serial output and pass/fail verdict. Requires WOKWI_CLI_TOKEN.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "timeout": {
+            "type": "integer",
+            "description": "Max simulation time in ms (default 15000)."
+          },
+          "expectText": {
+            "type": "string",
+            "description": "Text that must appear in serial output for success."
+          },
+          "failText": {
+            "type": "string",
+            "description": "Text that causes failure if found (use 'none' if no fail text)."
+          }
+        },
+        "required": [
+          "timeout",
+          "expectText",
+          "failText"
+        ]
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "wokwi"
+      ],
+      "category": "execute",
+      "cli": {
+        "command": [
+          "{settings.toolchain.active.path}/wokwi-cli.exe",
+          "{projectPath}",
+          "--timeout",
+          "{timeout}",
+          "--expect-text",
+          "{expectText}",
+          "--fail-text",
+          "{failText}"
+        ],
+        "cwd": "{projectPath}",
+        "env": {
+          "WOKWI_CLI_TOKEN": "{settings.wokwi.token}"
+        },
+        "timeoutMs": 120000,
+        "successCodes": [
+          0
+        ],
+        "stream": true,
+        "streamChannel": "compile:onOutput"
+      }
+    },
+    {
+      "name": "wokwi_scenario",
+      "description": "Run a Wokwi automation scenario (YAML: set-control/delay/wait-serial/write-serial/touch etc.) against the current project to drive virtual buttons/sensors and assert serial output. Returns scenario progress + serial. Requires WOKWI_CLI_TOKEN.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "scenario": {
+            "type": "string",
+            "description": "Path to the scenario YAML file (relative to project, e.g. 'test/scenario.yaml')."
+          }
+        },
+        "required": [
+          "scenario"
+        ]
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "wokwi"
+      ],
+      "category": "execute",
+      "cli": {
+        "command": [
+          "{settings.toolchain.active.path}/wokwi-cli.exe",
+          "{projectPath}",
+          "--scenario",
+          "{scenario}"
+        ],
+        "cwd": "{projectPath}",
+        "env": {
+          "WOKWI_CLI_TOKEN": "{settings.wokwi.token}"
+        },
+        "timeoutMs": 180000,
+        "stream": true,
+        "streamChannel": "compile:onOutput"
+      }
+    },
+    {
+      "name": "wokwi_screenshot",
+      "description": "Run the simulation and capture a screenshot of a specific part (e.g. an OLED display) at `time` ms, saving to `outFile`. Useful to verify visual output. Requires WOKWI_CLI_TOKEN.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "partId": {
+            "type": "string",
+            "description": "Part id in diagram.json to screenshot (e.g. 'oled1')."
+          },
+          "time": {
+            "type": "integer",
+            "description": "Simulation time in ms when to take the screenshot (default 3000)."
+          },
+          "outFile": {
+            "type": "string",
+            "description": "Output file path (relative to project, e.g. 'screenshot.png')."
+          }
+        },
+        "required": [
+          "partId",
+          "time",
+          "outFile"
+        ]
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "wokwi"
+      ],
+      "category": "execute",
+      "cli": {
+        "command": [
+          "{settings.toolchain.active.path}/wokwi-cli.exe",
+          "{projectPath}",
+          "--screenshot-part",
+          "{partId}",
+          "--screenshot-time",
+          "{time}",
+          "--screenshot-file",
+          "{outFile}"
+        ],
+        "cwd": "{projectPath}",
+        "env": {
+          "WOKWI_CLI_TOKEN": "{settings.wokwi.token}"
+        },
+        "timeoutMs": 120000
+      }
+    },
+    {
+      "name": "wokwi_compile_arduino",
+      "description": "Compile the current Arduino .ino project to firmware for Wokwi simulation using arduino-cli (must be on PATH, e.g. installed by the Arduino plugin or manually). Outputs to build/ and wokwi.toml points to it. Returns compile result; then run wokwi_run.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "fqbn": {
+            "type": "string",
+            "description": "Arduino board FQBN matching the diagram board (default arduino:avr:uno for Arduino Uno)."
+          }
+        },
+        "required": [
+          "fqbn"
+        ]
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "wokwi"
+      ],
+      "category": "execute",
+      "cli": {
+        "command": [
+          "arduino-cli",
+          "compile",
+          "--fqbn",
+          "{fqbn}",
+          "--output-dir",
+          "{projectPath}/build",
+          "{projectPath}"
+        ],
+        "cwd": "{projectPath}",
+        "timeoutMs": 240000
+      }
+    },
+    {
+      "name": "wokwi_get_status",
+      "description": "Show Wokwi CLI version and connectivity (verifies the detected wokwi-cli works). Read-only, safe.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "wokwi"
+      ],
+      "category": "query",
+      "cli": {
+        "command": [
+          "{settings.toolchain.active.path}/wokwi-cli.exe",
+          "--version"
+        ],
+        "timeoutMs": 30000
+      }
+    }
+  ],
+  "commands": [
+    {
+      "id": "wokwi.run",
+      "title": "运行模拟",
+      "icon": "play",
+      "kind": "action",
+      "placement": "toolbar.action",
+      "when": "projectType=wokwi && activeToolchain=wokwi-simulator",
+      "transport": "cli",
+      "cli": {
+        "command": [
+          "{settings.toolchain.active.path}/wokwi-cli.exe",
+          "{projectPath}",
+          "--timeout",
+          "10000"
+        ],
+        "cwd": "{projectPath}",
+        "env": {
+          "WOKWI_CLI_TOKEN": "{settings.wokwi.token}"
+        },
+        "timeoutMs": 60000,
+        "successCodes": [
+          0,
+          42
+        ],
+        "stream": true,
+        "streamChannel": "compile:onOutput"
+      }
+    },
+    {
+      "id": "wokwi.lint",
+      "title": "校验电路图",
+      "icon": "search-check",
+      "kind": "action",
+      "placement": "toolbar.action",
+      "when": "projectType=wokwi && activeToolchain=wokwi-simulator",
+      "transport": "cli",
+      "cli": {
+        "command": [
+          "{settings.toolchain.active.path}/wokwi-cli.exe",
+          "lint",
+          "{projectPath}"
+        ],
+        "cwd": "{projectPath}",
+        "timeoutMs": 60000
+      }
+    }
+  ],
+  "views": [
+    {
+      "id": "status",
+      "title": "状态",
+      "icon": "info",
+      "slot": "activitybar",
+      "type": "webview",
+      "entry": "ui/status.html",
+      "events": [
+        "toolchain:statusChanged"
+      ]
+    }
+  ],
+  "mcpServers": [
+    {
+      "name": "wokwi",
+      "command": "{settings.toolchain.active.path}/wokwi-cli.exe",
+      "args": [
+        "mcp"
+      ],
+      "autoApprove": false
+    }
+  ],
+  "skills": [
+    {
+      "name": "wokwi-sim",
+      "description": "Wokwi 电路模拟流程：校验图 → 编译固件 → 运行模拟 → 读串口 → 自动化断言",
+      "prompt": "按 Wokwi 模拟工作流：\n1. 先用 wokwi_lint 校验 diagram.json（改过电路后必做）\n2. Arduino 项目用 wokwi_compile_arduino 编译固件到 build/（fqbn 与 diagram 板子一致）\n3. 用 wokwi_run 运行模拟（timeout 按需），读串口输出验证行为\n4. 要自动断言用 wokwi_ci_test（expectText/failText）；要驱动虚拟按键/传感器用 wokwi_scenario\n5. 未配置 WOKWI_CLI_TOKEN 时提示用户在插件设置页配置（wokwi-cli 云端引擎需要授权）"
+    }
+  ]
+}

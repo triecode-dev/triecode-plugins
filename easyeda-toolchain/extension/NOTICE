@@ -1,0 +1,15 @@
+TrieCode EDA 桥 (triecode-easyeda-gateway) 1.0.0
+===============================
+本扩展基于立创官方 run-api-gateway（Apache-2.0）fork 改进，原作者版权：
+  Copyright [2024] JLCEDA <support@lceda.cn>
+
+主要改动（修改过的文件：src/index.ts、extension.json、locales/*）：
+  - 结果安全序列化（深度/循环/数量受限），不再因 JSON.stringify 抛异常丢结果
+  - 重试改指数退避（2s→30s 封顶），不再 5 次后永久停摆
+  - 心跳 pong 按序号匹配，迟到 pong 不再误取消重连
+  - 连接后主动上报 EDA 版本/工程/文档状态
+  - 收到桥 shutdown 消息优雅停止
+  - 改名 triecode-easyeda-gateway（新 uuid），菜单本地化
+
+本扩展沿用 Apache License 2.0。商标：产品名不含 EasyEDA/嘉立创EDA 商标，
+仅在功能描述与开源发布标题中提及原作者。

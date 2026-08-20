@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>STM32Cube 工具链状态</title>
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; padding: 14px; color: #1f2937; background: #fff; font-size: 12px; overflow-x: hidden; }
+  .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 4px 0; }
+  .lbl { color: #6b7280; flex-shrink: 0; white-space: nowrap; }
+  .val { color: #111827; word-break: break-all; text-align: right; flex: 1 1 auto; min-width: 0; }
+  .ok { color: #16a34a; font-weight: 600; }
+  .err { color: #dc2626; }
+  button { font-size: 12px; padding: 5px 12px; border-radius: 6px; border: 1px solid #2563eb; background: #2563eb; color: #fff; cursor: pointer; margin: 4px 6px 0 0; }
+  button.ghost { background: #fff; color: #2563eb; }
+  input { font-size: 12px; padding: 5px 8px; border: 1px solid #d1d5db; border-radius: 6px; width: 100%; box-sizing: border-box; margin-top: 6px; }
+  a { color: #2563eb; }
+  .guide { color: #6b7280; line-height: 1.7; }
+</style>
+</head>
+<body>
+  <div id="body">加载中…</div>
+
+  <script>
+    // host.invoke 协议客户端
+    var nextId = 1, pending = {};
+    function send(method, args) {
+      return new Promise(function (resolve, reject) {
+        var id = 'm' + (nextId++);
+        pending[id] = { resolve: resolve, reject: reject };
+        window.parent.postMessage({ type: 'host.invoke', id: id, method: method, args: args || {} }, '*');
+      });
+    }
+    var PLUGIN = 'stm32-cube-toolchain';
+    var CLT_URL = 'https://www.st.com/en/development-tools/stm32cubeclt.html';
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+    window.addEventListener('message', function (e) {
+      var d = e.data;
+      if (!d || typeof d !== 'object') return;
+      if (d.type === 'host.invoke.result') { var p = pending[d.id]; if (!p) return; delete pending[d.id]; if (d.ok) p.resolve(d.data); else p.reject(new Error(d.error || 'unknown')); }
+      else if (d.type === 'state.push' && d.key === 'toolchain:statusChanged') render(d.value);
+    });
+    window.parent.postMessage({ type: 'ready' }, '*');
+    window.parent.postMessage({ type: 'state.subscribe', events: ['toolchain:statusChanged'] }, '*');
+
+    function render(st) {
+      if (!st) return;
+      var el = document.getElementById('body');
+      if (!st.detected || !st.active) {
+        el.innerHTML =
+          '<div class="card guide">未检测到 STM32CubeCLT。<br>· <a href="' + CLT_URL + '" target="_blank">下载 STM32CubeCLT</a>（ST 官网，免费免登录；含 CMake/Ninja/arm-none-eabi-gcc/STM32_Programmer_CLI）<br>· 安装后点「重新检测」，或手动输入 CubeCLT 根目录（含 GNU-tools-for-STM32 子目录）</div>' +
+          '<button class="ghost" id="detectBtn">重新检测</button>' +
+          '<input id="pathInput" placeholder="STM32CubeCLT 根目录，如 C:\\ST\\STM32CubeCLT_1.16.0" />' +
+          '<button class="ghost" id="setPathBtn">手动设置</button>' +
+          (st.error ? '<div class="err" style="margin-top:6px">' + esc(st.error) + '</div>' : '');
+        bind();
+        return;
+      }
+      var a = st.active;
+      el.innerHTML =
+        '<div class="card"><b class="ok">✓ 已检测到 STM32CubeCLT</b>' +
+        row('路径', a.path) +
+        row('来源', a.source || '') +
+        '</div>' +
+        '<div class="card guide">编译 = CMake 配置 + Ninja 构建（arm-none-eabi-gcc）；烧录 = STM32_Programmer_CLI（SWD）。<br>新建「STM32 裸机」工程或打开已有 CubeMX CMake 工程后，即可编译/烧录。</div>' +
+        '<button class="ghost" id="detectBtn2">重新检测</button>' +
+        '<button class="ghost" id="setPathBtn2">手动指定路径</button>';
+      document.getElementById('detectBtn2').onclick = detect;
+      document.getElementById('setPathBtn2').onclick = function () { showManual(); };
+    }
+    function row(l, v) { return '<div class="row"><span class="lbl">' + esc(l) + '</span><span class="val">' + esc(v) + '</span></div>'; }
+    function bind() {
+      var d = document.getElementById('detectBtn'); if (d) d.onclick = detect;
+      var s = document.getElementById('setPathBtn'); if (s) s.onclick = setManual;
+    }
+    function detect() { send('toolchain:detect', { pluginId: PLUGIN }).then(render).catch(function (e) { render({ detected: false, active: null, error: e.message }); }); }
+    function setManual() {
+      var v = document.getElementById('pathInput').value.trim();
+      if (!v) return;
+      send('toolchain:setPath', { pluginId: PLUGIN, dir: v }).then(render).catch(function (e) { render({ detected: false, active: null, error: e.message }); });
+    }
+    function showManual() {
+      var el = document.getElementById('body');
+      var input = document.createElement('input');
+      input.placeholder = 'STM32CubeCLT 根目录（含 GNU-tools-for-STM32 子目录）';
+      var btn = document.createElement('button'); btn.className = 'ghost'; btn.textContent = '设置';
+      btn.onclick = function () { var v = input.value.trim(); if (v) send('toolchain:setPath', { pluginId: PLUGIN, dir: v }).then(render).catch(function (e) { render({ detected: false, active: null, error: e.message }); }); };
+      el.appendChild(document.createElement('div')).appendChild(input); el.appendChild(btn);
+    }
+
+    send('toolchain:status', { pluginId: PLUGIN }).then(render).catch(function (e) { render({ detected: false, active: null, error: e.message }); });
+  </script>
+</body>
+</html>

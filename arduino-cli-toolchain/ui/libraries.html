@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>库管理</title>
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; padding: 14px; color: #1f2937; background: #fff; overflow-x: hidden; }
+  /* 搜索行：输入框可收缩让位（面板拖窄不产生 iframe 水平滚动），按钮不压缩不换行 */
+  #q { flex: 1 1 auto; min-width: 0; width: auto; }
+  .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 12px; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid #f3f4f6; }
+  .row:last-child { border-bottom: none; }
+  .row > span { flex: 1; min-width: 0; }
+  .row .ctrl { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  input { font-size: 12px; padding: 5px 8px; border: 1px solid #d1d5db; border-radius: 6px; width: 100%; box-sizing: border-box; }
+  button { font-size: 12px; padding: 5px 12px; border-radius: 6px; border: 1px solid #2563eb; background: #2563eb; color: #fff; cursor: pointer; white-space: nowrap; }
+  button.ghost { background: transparent; color: #6b7280; border-color: #d1d5db; }
+  button:disabled { opacity: .5; cursor: default; }
+  .ver { color: #6b7280; font-size: 11px; }
+  .progress { width: 100%; height: 6px; background: #f3f4f6; border-radius: 3px; overflow: hidden; }
+  .bar { height: 100%; background: #2563eb; width: 0; transition: width .2s; }
+  .empty { color: #9ca3af; font-size: 12px; padding: 8px 0; }
+  .desc { color: #6b7280; font-size: 11px; }
+</style>
+</head>
+<body>
+
+  <div class="card">
+    <div style="display:flex; gap:6px; margin-bottom:8px;">
+      <input id="q" placeholder="搜索库，如 WiFi、Servo…" />
+      <button id="searchBtn" style="flex-shrink:0;">搜索</button>
+    </div>
+    <div id="searchResults"></div>
+  </div>
+
+  <div class="card">
+    <b>已安装库</b>
+    <div id="installed"></div>
+  </div>
+
+  <script>
+    // ── host.invoke 协议客户端（与宿主双向 postMessage，P4） ──
+    var nextId = 1, pending = {};
+    function send(method, args) {
+      return new Promise(function (resolve, reject) {
+        var id = 'm' + (nextId++);
+        pending[id] = { resolve: resolve, reject: reject };
+        window.parent.postMessage({ type: 'host.invoke', id: id, method: method, args: args || {} }, '*');
+      });
+    }
+    function renderProgress(name, stage, percent) {
+      var row = document.querySelector('.row[data-name="' + cssEscape(name) + '"]');
+      if (!row) return;
+      var bar = row.querySelector('.bar'), txt = row.querySelector('.prog');
+      if (stage === 'complete' || percent >= 100) {
+        if (bar) bar.style.width = '100%';
+        if (txt) txt.textContent = '✓ 完成';
+      } else if (stage === 'error') {
+        if (txt) txt.textContent = '失败';
+      } else {
+        if (bar) bar.style.width = (percent || 0) + '%';
+        if (txt) txt.textContent = (percent || 0) + '%';
+      }
+    }
+    window.addEventListener('message', function (e) {
+      var d = e.data;
+      if (!d || typeof d !== 'object') return;
+      if (d.type === 'host.invoke.result') {
+        var p = pending[d.id];
+        if (!p) return; delete pending[d.id];
+        if (d.ok) p.resolve(d.data); else p.reject(new Error(d.error || 'unknown'));
+      } else if (d.type === 'state.push' && d.key === 'lib:installProgress') {
+        var v = d.value || {};
+        if (v.name) renderProgress(v.name, v.stage, v.percent);
+      }
+    });
+    window.parent.postMessage({ type: 'ready' }, '*');
+    window.parent.postMessage({ type: 'state.subscribe', events: ['lib:installProgress'] }, '*');
+
+    function escapeHtml(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+    function cssEscape(s) {
+      return String(s).replace(/"/g, '\\"').replace(/\\/g, '\\\\');
+    }
+
+    // ── 已装列表 ──
+    // 已安装库名集合：搜索结果显示「已安装」而非「安装」，避免重复安装/误导
+    var installedNames = {};
+    function verOf(p) { return p.installed_version || p.installedVersion || p.version || ''; }
+    function renderInstalled(list) {
+      installedNames = {};
+      var el = document.getElementById('installed');
+      if (!list || list.length === 0) { el.innerHTML = '<div class="empty">暂无已安装库</div>'; return; }
+      el.innerHTML = list.map(function (p) {
+        installedNames[p.name] = true;
+        return '<div class="row" data-name="' + escapeHtml(p.name) + '"><span><b>' + escapeHtml(p.name) + '</b> <span class="ver">v' + escapeHtml(verOf(p)) + '</span></span>'
+          + '<div class="ctrl"><button class="ghost" data-uninstall="' + escapeHtml(p.name) + '">卸载</button></div></div>';
+      }).join('');
+    }
+    function loadInstalled() {
+      send('library:list').then(renderInstalled).catch(function (e) {
+        document.getElementById('installed').innerHTML = '<div class="empty">加载失败：' + escapeHtml(e.message) + '</div>';
+      });
+    }
+
+    // ── 搜索 + 安装 ──
+    function renderSearch(list) {
+      var el = document.getElementById('searchResults');
+      if (!list || list.length === 0) { el.innerHTML = '<div class="empty">无匹配结果</div>'; return; }
+      el.innerHTML = list.map(function (p) {
+        // 已安装的库显示「已安装」（禁用）而非「安装」
+        var btn = installedNames[p.name]
+          ? '<button class="ghost" disabled title="已安装">✓ 已安装</button>'
+          : '<button data-install="' + escapeHtml(p.name) + '">安装</button>';
+        return '<div class="row" data-name="' + escapeHtml(p.name) + '">'
+          + '<span><b>' + escapeHtml(p.name) + '</b><div class="desc">' + escapeHtml((p.description || '').slice(0, 60)) + '</div></span>'
+          + '<div class="ctrl">' + btn + '<span class="prog ver"></span></div>'
+          + '<div class="progress"><div class="bar"></div></div>'
+          + '</div>';
+      }).join('');
+    }
+    function doSearch() {
+      var q = document.getElementById('q').value.trim();
+      if (q.length < 2) return;
+      send('library:search', { query: q }).then(renderSearch).catch(function (e) {
+        document.getElementById('searchResults').innerHTML = '<div class="empty">搜索失败：' + escapeHtml(e.message) + '</div>';
+      });
+    }
+    document.getElementById('searchBtn').addEventListener('click', doSearch);
+    document.getElementById('q').addEventListener('keydown', function (e) { if (e.key === 'Enter') doSearch(); });
+    document.getElementById('searchResults').addEventListener('click', function (e) {
+      var btn = e.target.closest('button[data-install]');
+      if (!btn) return;
+      var name = btn.getAttribute('data-install');
+      btn.disabled = true;
+      btn.textContent = '安装中…';
+      send('library:install', { name: name })
+        .then(function () {
+          installedNames[name] = true;
+          btn.textContent = '✓ 已安装';
+          btn.disabled = true;
+          btn.classList.add('ghost');
+          // 清掉残留进度文本（如安装过程中的「0%」），进度条置满
+          var prog = btn.closest('.ctrl')?.querySelector('.prog');
+          if (prog) prog.textContent = '';
+          var bar = btn.closest('.row')?.querySelector('.bar');
+          if (bar) bar.style.width = '100%';
+          setTimeout(loadInstalled, 800);
+        })
+        .catch(function (err) { btn.textContent = '失败'; alert('安装失败：' + err.message); });
+    });
+    document.getElementById('installed').addEventListener('click', function (e) {
+      var btn = e.target.closest('button[data-uninstall]');
+      if (!btn) return;
+      var name = btn.getAttribute('data-uninstall');
+      btn.disabled = true;
+      send('library:uninstall', { name: name })
+        .then(function () {
+          delete installedNames[name];
+          // 搜索结果里若有该库，把「已安装」按钮改回「安装」，并清掉进度残留
+          var row = document.querySelector('#searchResults .row[data-name="' + cssEscape(name) + '"]');
+          if (row) {
+            var ibtn = row.querySelector('button');
+            if (ibtn && !ibtn.getAttribute('data-install')) {
+              ibtn.outerHTML = '<button data-install="' + escapeHtml(name) + '">安装</button>';
+            }
+            var prog = row.querySelector('.prog'); if (prog) prog.textContent = '';
+            var bar = row.querySelector('.bar'); if (bar) bar.style.width = '0%';
+          }
+          loadInstalled();
+        })
+        .catch(function (err) { alert('卸载失败：' + err.message); btn.disabled = false; });
+    });
+
+    loadInstalled();
+  </script>
+</body>
+</html>

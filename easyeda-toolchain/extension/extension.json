@@ -1,0 +1,204 @@
+{
+	"name": "triecode-easyeda-gateway",
+	"uuid": "13466ad4b6b4483c8f0f6a8f0a8d953f",
+	"displayName": "TrieCode EDA 桥",
+	"description": "为 TrieCode 提供 WebSocket 网关桥接服务（基于立创官方 run-api-gateway 改进，Apache-2.0，原作者 JLCEDA）",
+	"version": "1.0.0",
+	"publisher": "TrieCode",
+	"engines": {
+		"eda": "~3.2.0"
+	},
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/triecode/triecode-easyeda-gateway"
+	},
+	"categories": "Other",
+	"keywords": [
+		"API",
+		"Gateway",
+		"Bridge",
+		"AI",
+		"TrieCode"
+	],
+	"images": {
+		"logo": "./images/logo.png"
+	},
+	"homepage": "https://github.com/triecode/triecode-easyeda-gateway",
+	"bugs": "https://github.com/triecode/triecode-easyeda-gateway/issues",
+	"activationEvents": {
+		"onStartupFinished": true
+	},
+	"entry": "./dist/index",
+	"dependentExtensions": {},
+	"headerMenus": {
+		"home": [
+			{
+				"id": "API Gateway",
+				"title": "TrieCode EDA 桥",
+				"menuItems": [
+					{
+						"id": "Reconnect",
+						"title": "重新连接",
+						"registerFn": "reconnect"
+					},
+					{
+						"id": "StopConnection",
+						"title": "停止连接",
+						"registerFn": "stopConnection"
+					},
+					{
+						"id": "ToggleAutoConnect",
+						"title": "切换自动连接",
+						"registerFn": "toggleAutoConnect"
+					},
+					{
+						"id": "About",
+						"title": "关于…",
+						"registerFn": "about"
+					}
+				]
+			}
+		],
+		"blank": [
+			{
+				"id": "API Gateway",
+				"title": "TrieCode EDA 桥",
+				"menuItems": [
+					{
+						"id": "Reconnect",
+						"title": "重新连接",
+						"registerFn": "reconnect"
+					},
+					{
+						"id": "StopConnection",
+						"title": "停止连接",
+						"registerFn": "stopConnection"
+					},
+					{
+						"id": "ToggleAutoConnect",
+						"title": "切换自动连接",
+						"registerFn": "toggleAutoConnect"
+					},
+					{
+						"id": "About",
+						"title": "关于…",
+						"registerFn": "about"
+					}
+				]
+			}
+		],
+		"sch": [
+			{
+				"id": "API Gateway",
+				"title": "TrieCode EDA 桥",
+				"menuItems": [
+					{
+						"id": "Reconnect",
+						"title": "重新连接",
+						"registerFn": "reconnect"
+					},
+					{
+						"id": "StopConnection",
+						"title": "停止连接",
+						"registerFn": "stopConnection"
+					},
+					{
+						"id": "ToggleAutoConnect",
+						"title": "切换自动连接",
+						"registerFn": "toggleAutoConnect"
+					},
+					{
+						"id": "About",
+						"title": "关于…",
+						"registerFn": "about"
+					}
+				]
+			}
+		],
+		"symbol": [
+			{
+				"id": "API Gateway",
+				"title": "TrieCode EDA 桥",
+				"menuItems": [
+					{
+						"id": "Reconnect",
+						"title": "重新连接",
+						"registerFn": "reconnect"
+					},
+					{
+						"id": "StopConnection",
+						"title": "停止连接",
+						"registerFn": "stopConnection"
+					},
+					{
+						"id": "ToggleAutoConnect",
+						"title": "切换自动连接",
+						"registerFn": "toggleAutoConnect"
+					},
+					{
+						"id": "About",
+						"title": "关于…",
+						"registerFn": "about"
+					}
+				]
+			}
+		],
+		"pcb": [
+			{
+				"id": "API Gateway",
+				"title": "TrieCode EDA 桥",
+				"menuItems": [
+					{
+						"id": "Reconnect",
+						"title": "重新连接",
+						"registerFn": "reconnect"
+					},
+					{
+						"id": "StopConnection",
+						"title": "停止连接",
+						"registerFn": "stopConnection"
+					},
+					{
+						"id": "ToggleAutoConnect",
+						"title": "切换自动连接",
+						"registerFn": "toggleAutoConnect"
+					},
+					{
+						"id": "About",
+						"title": "关于…",
+						"registerFn": "about"
+					}
+				]
+			}
+		],
+		"footprint": [
+			{
+				"id": "API Gateway",
+				"title": "TrieCode EDA 桥",
+				"menuItems": [
+					{
+						"id": "Reconnect",
+						"title": "重新连接",
+						"registerFn": "reconnect"
+					},
+					{
+						"id": "StopConnection",
+						"title": "停止连接",
+						"registerFn": "stopConnection"
+					},
+					{
+						"id": "ToggleAutoConnect",
+						"title": "切换自动连接",
+						"registerFn": "toggleAutoConnect"
+					},
+					{
+						"id": "About",
+						"title": "关于…",
+						"registerFn": "about"
+					}
+				]
+			}
+		]
+	}
+}

@@ -1,0 +1,1215 @@
+{
+  "id": "easyeda-toolchain",
+  "name": "立创EDA",
+  "version": "0.2.0",
+  "description": "把立创EDA(EasyEDA)接入 AI：工程/原理图/PCB/器件库/DRC 自动化设计。桥进程由本插件托管，EDA 侧需安装随包分发的 triecode-easyeda-gateway 扩展。需配合最新版软件（含 {nodeBin} 统一 Node 运行时）。",
+  "developer": "TrieCode",
+  "icon": "easyeda",
+  "category": "EDA 设计",
+  "capabilities": [
+    "mcp",
+    "skills"
+  ],
+  "dependencies": [
+    {
+      "name": "node",
+      "version": "22.14.0",
+      "url": "https://registry.npmmirror.com/-/binary/node/v22.14.0/node-v22.14.0-win-x64.zip",
+      "unzip": true
+    }
+  ],
+  "mcpServers": [
+    {
+      "name": "easyeda",
+      "command": "{nodeBin}",
+      "args": [
+        "{pluginDir}/server/dist/server.cjs",
+        "--docs",
+        "{pluginDir}/docs/index.json"
+      ],
+      "autoApprove": false
+    }
+  ],
+  "tools": [
+    {
+      "name": "redesign",
+      "description": "一键重新布局并接线（确定性，AI 只调一次）：主 IC 居中、电源(VCC)朝上/地(GND)朝下、信号流左到右、外围件贴对应引脚、器件间留布线通道，随后自动布全部网络（Steiner）。返回移动+布线+验证结果。核心省略自动选引脚最多的器件。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "core": {
+            "type": "string"
+          },
+          "wire": {
+            "type": "boolean"
+          },
+          "apply": {
+            "type": "boolean"
+          }
+        }
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_sch_redesign"
+      },
+      "category": "edit"
+    },
+    {
+      "name": "status",
+      "description": "桥与 EDA 连接状态：返回桥进程、已连接 EDA 窗口、活动窗口、端口（只读）。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_status"
+      },
+      "category": "query"
+    },
+    {
+      "name": "plan_layout",
+      "description": "重排原理图元器件的第一步必用工具：AI 只表达意图（mode/anchors/groups/netFlags），引擎算坐标保证不重叠。最简调用 {mode:\"central-lr\", core:\"U1\", layout:{apply:true}} 即可自动摆好全部器件+网络标记；要贴脚加 anchors:[{s:\"C3\",p:\"1\",t:\"U1\",tp:\"RST\"}]。apply=true 直接落图并返回 violations。不要用 sch_modify 手写坐标摆放。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "central-lr",
+              "functional-zones",
+              "rearrange"
+            ],
+            "description": "central-lr 单核心芯片左右外设；functional-zones 多模块功能分区；rearrange 原位微调"
+          },
+          "core": {
+            "type": "string",
+            "description": "核心芯片位号（central-lr 必需）"
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "s": {
+                  "type": "string"
+                },
+                "p": {
+                  "type": "string"
+                },
+                "t": {
+                  "type": "string"
+                },
+                "tp": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "贴脚约束"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "members": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "flow",
+                    "pair",
+                    "cluster"
+                  ]
+                },
+                "direction": {
+                  "type": "number"
+                }
+              }
+            },
+            "description": "功能块"
+          },
+          "netFlags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "net": {
+                  "type": "string"
+                },
+                "dir": {
+                  "type": "string",
+                  "enum": [
+                    "up",
+                    "down",
+                    "left",
+                    "right"
+                  ]
+                }
+              }
+            },
+            "description": "网络标记方向意图"
+          },
+          "layout": {
+            "type": "object",
+            "properties": {
+              "clearance": {
+                "type": "number"
+              },
+              "spacing": {
+                "type": "number"
+              },
+              "page": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "keep"
+                ]
+              },
+              "keepDesignators": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "apply": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_sch_plan_layout"
+      },
+      "category": "edit"
+    },
+    {
+      "name": "verify_layout",
+      "description": "摆放/接线后必查：同尺校验布局（overlaps 器件重叠含5sch间距 / netflagsInsideParts 标记压件 / outOfSheet 越界），返回 ok 布尔。plan_layout 后调用确认无重叠。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_sch_verify_layout"
+      },
+      "category": "query"
+    },
+    {
+      "name": "list_windows",
+      "description": "列出所有已连接 EDA 窗口及其状态（活动/工程/文档类型）。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_list_windows"
+      },
+      "category": "query"
+    },
+    {
+      "name": "select_window",
+      "description": "当有多个 EDA 窗口时，指定后续操作使用哪个窗口。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "windowId": {
+            "type": "string",
+            "description": "要设为活动的窗口 ID（来自 list_windows）"
+          }
+        },
+        "required": [
+          "windowId"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_select_window"
+      },
+      "category": "modify"
+    },
+    {
+      "name": "execute",
+      "description": "在立创EDA中执行任意JS（必须 return，console.log 不捕获）。可调全部官方 eda.* API。先 doc_search 查签名，注意坐标单位与 null 即失败。高风险任意代码，先确认意图。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "JS 代码主体"
+          },
+          "windowId": {
+            "type": "string",
+            "description": "可选：目标窗口 ID"
+          },
+          "timeoutMs": {
+            "type": "number",
+            "description": "可选：超时"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_execute"
+      },
+      "category": "execute"
+    },
+    {
+      "name": "doc_search",
+      "description": "检索插件自带的立创EDA API 参考（类名/方法签名/枚举值）。写复杂 EDA 调用前先查正确签名。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "搜索关键词（英文类名/方法名最佳）"
+          },
+          "maxResults": {
+            "type": "number",
+            "description": "可选：返回条数（默认 8）"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_doc_search"
+      },
+      "category": "query"
+    },
+    {
+      "name": "convert",
+      "description": "立创EDA 坐标单位换算（PCB=mil / 原理图=0.01inch / mm）。放件前换算避免 10 倍错位。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number"
+          },
+          "from": {
+            "type": "string",
+            "enum": [
+              "mm",
+              "mil",
+              "sch"
+            ]
+          },
+          "to": {
+            "type": "string",
+            "enum": [
+              "mm",
+              "mil",
+              "sch"
+            ]
+          }
+        },
+        "required": [
+          "value",
+          "from",
+          "to"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_convert"
+      },
+      "category": "query"
+    },
+    {
+      "name": "project_info",
+      "description": "返回当前打开的立创EDA 工程与文档信息（只读）。PCB 操作需先有工程且激活 PCB 文档。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_project_info"
+      },
+      "category": "query"
+    },
+    {
+      "name": "project_list",
+      "description": "遍历团队/文件夹列出可打开工程（最多 50 个）。openProject 可能丢弃未保存修改，打开前提示用户保存。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "maxItems": {
+            "type": "number",
+            "description": "可选：条数上限"
+          }
+        }
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_project_list"
+      },
+      "category": "query"
+    },
+    {
+      "name": "project_open",
+      "description": "按 UUID 打开立创EDA 工程。注意：可能丢弃当前工程未保存修改，请先询问用户确认保存。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "projectUuid": {
+            "type": "string",
+            "description": "目标工程 UUID（来自 project_list）"
+          }
+        },
+        "required": [
+          "projectUuid"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_project_open"
+      },
+      "category": "modify"
+    },
+    {
+      "name": "project_create",
+      "description": "新建空白工程并返回 UUID。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_project_create"
+      },
+      "category": "modify"
+    },
+    {
+      "name": "document_state",
+      "description": "检查当前激活文档类型（原理图/PCB/封装等）与工程是否打开。执行 PCB/SCH 操作前先调用。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "want": {
+            "type": "string",
+            "enum": [
+              "PCB",
+              "SCHEMATIC_PAGE",
+              "FOOTPRINT",
+              "SYMBOL_COMPONENT",
+              "PANEL"
+            ],
+            "description": "可选：期望文档类型"
+          }
+        }
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_document_state"
+      },
+      "category": "query"
+    },
+    {
+      "name": "doc_open",
+      "description": "按文档 uuid 打开并激活（原理图页/PCB/封装等），自动轮询确认激活成功，返回 tabId 与文档类型。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "description": "要打开的文档 uuid（来自 project_info/document_state/sch_list 等）"
+          }
+        },
+        "required": [
+          "uuid"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_doc_open"
+      },
+      "category": "modify"
+    },
+    {
+      "name": "document_save",
+      "description": "保存当前激活的 PCB/原理图文档。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_document_save"
+      },
+      "category": "modify"
+    },
+    {
+      "name": "lib_search",
+      "description": "在立创EDA 器件库按关键词搜索器件（返回 name/uuid/libraryUuid/封装名）。放件前先搜索拿器件 UUID。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "description": "搜索关键词（如 STM32F103 / 10k 0603）"
+          },
+          "libraryUuid": {
+            "type": "string",
+            "description": "可选：限定库"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number",
+            "description": "可选：每页条数（默认 8，最大 20）"
+          }
+        },
+        "required": [
+          "keyword"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_lib_search"
+      },
+      "category": "query"
+    },
+    {
+      "name": "lib_get_by_lcsc",
+      "description": "按立创商城 LCSC 编号（C 开头，如 C14663）查器件，返回 uuid/封装。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "lcsc": {
+            "type": "string"
+          },
+          "allowMultiMatch": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "lcsc"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_lib_get_by_lcsc"
+      },
+      "category": "query"
+    },
+    {
+      "name": "lib_search_symbol",
+      "description": "在符号库搜索符号。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string"
+          },
+          "libraryUuid": {
+            "type": "string"
+          },
+          "pageSize": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "keyword"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_lib_search_symbol"
+      },
+      "category": "query"
+    },
+    {
+      "name": "lib_search_footprint",
+      "description": "在封装库搜索封装。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string"
+          },
+          "libraryUuid": {
+            "type": "string"
+          },
+          "pageSize": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "keyword"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_lib_search_footprint"
+      },
+      "category": "query"
+    },
+    {
+      "name": "sch_list",
+      "description": "列出当前原理图全部器件，含每个器件的包围盒 bbox（尺寸，sch 单位）与重叠器件对列表。放置/移动后务必调用它检查是否重叠。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_sch_list"
+      },
+      "category": "query"
+    },
+    {
+      "name": "sch_place_component",
+      "description": "在原理图坐标 (x,y) 放置器件，返回新器件的 bbox（尺寸）与引脚坐标（供布线直接用）。旋转默认 0（正立），保持器件方向除非布局明确需要。坐标默认 mm，可传 unit=sch。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "deviceUuid": {
+            "type": "string"
+          },
+          "libraryUuid": {
+            "type": "string"
+          },
+          "x": {
+            "type": "number",
+            "description": "X 坐标（单位见 unit，默认 mm）"
+          },
+          "y": {
+            "type": "number",
+            "description": "Y 坐标（单位见 unit，默认 mm）"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "mm",
+              "sch"
+            ],
+            "description": "坐标单位（默认 mm）"
+          },
+          "rotation": {
+            "type": "number"
+          },
+          "mirror": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deviceUuid",
+          "libraryUuid",
+          "x",
+          "y"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_sch_place_component"
+      },
+      "category": "modify"
+    },
+    {
+      "name": "sch_modify",
+      "description": "按 primitiveId 移动/旋转/改位号原理图元件，也能移动 VCC/GND 等网络标记（async 图元模式）。返回新坐标+bbox+引脚。坐标默认 mm，可传 unit=sch。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "primitiveId": {
+            "type": "string"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "mm",
+              "sch"
+            ]
+          },
+          "rotation": {
+            "type": "number"
+          },
+          "designator": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "primitiveId"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_sch_modify"
+      },
+      "category": "modify"
+    },
+    {
+      "name": "sch_add_net_flag",
+      "description": "在原理图坐标处添加电源/地网络标记（net flag）。identification 仅支持 Power/Ground/AnalogGround/ProtectGround；net 是网络名（如 VCC/3V3/GND）。返回标记坐标。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "identification": {
+            "type": "string",
+            "enum": [
+              "Power",
+              "Ground",
+              "AnalogGround",
+              "ProtectGround"
+            ]
+          },
+          "net": {
+            "type": "string"
+          },
+          "x": {
+            "type": "number",
+            "description": "X 坐标（mm）"
+          },
+          "y": {
+            "type": "number",
+            "description": "Y 坐标（mm）"
+          }
+        },
+        "required": [
+          "identification",
+          "net",
+          "x",
+          "y"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_sch_add_net_flag"
+      },
+      "category": "modify"
+    },
+    {
+      "name": "sch_get_pins",
+      "description": "按器件 id 读取全部引脚的精确坐标（sch 单位）。布线前先调用，避免端点连错。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "primitiveId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "primitiveId"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_sch_get_pins"
+      },
+      "category": "query"
+    },
+    {
+      "name": "sch_wire",
+      "description": "按折线端点画导线（可带网络名）。坐标默认 mm，可传 unit=sch。端点用 sch_get_pins 读精确引脚坐标，否则连不上。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "net": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "mm",
+              "sch"
+            ]
+          }
+        },
+        "required": [
+          "points"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_sch_wire"
+      },
+      "category": "modify"
+    },
+    {
+      "name": "wire_delete",
+      "description": "删除原理图全部导线（或按 net 只删指定网络）。⚠️ 立创导线没有 .id 属性，必须用 getState_PrimitiveId() 取 id（手写 w.id 会静默失败）。重排前先删旧线。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "net": {
+            "type": "string"
+          }
+        }
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_sch_wire_delete"
+      },
+      "category": "edit"
+    },
+    {
+      "name": "wire_net",
+      "description": "多端点网络一次布线（Steiner 树）：把一个网络的全部端点一次连起来（晶振/去耦/电源这类多点网络用），不用多次 wire_routed 再手工汇合。pins 省略自动从网表找。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "net": {
+            "type": "string"
+          },
+          "pins": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "component": {
+                  "type": "string"
+                },
+                "pin": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "apply": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "net"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_sch_wire_net"
+      },
+      "category": "edit"
+    },
+    {
+      "name": "verify_wiring",
+      "description": "布线电气自证：读回全部导线检查 ①端点是否精确吸附引脚(≤1sch) ②是否穿过元器件/引脚 ③每网络闭合性。布线完成后调用，ok=true 才算电气正确。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_sch_verify_wiring"
+      },
+      "category": "query"
+    },
+    {
+      "name": "wire_repair",
+      "description": "修复布线（拆线重布）：验证后把不完整网络拆掉用 Steiner 重布，最多 3 轮。多网络布线后自动修复没连上的。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_sch_wire_repair"
+      },
+      "category": "edit"
+    },
+    {
+      "name": "wire_routed",
+      "description": "确定性绕障布线：自动在两点间画一条**绕开所有元器件本体和其他无关引脚**的正交导线。from/to 用 位号.引脚（{component:\"C1\",pin:\"1\"} → {component:\"U1\",pin:\"XTAL1\"}）；pin 可省略自动选距目标最近的端（电容 AB 等效选近端）。apply=true 直接画线。线绝不穿过元器件/无关引脚。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "object",
+            "properties": {
+              "component": {
+                "type": "string"
+              },
+              "pin": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "component"
+            ]
+          },
+          "to": {
+            "type": "object",
+            "properties": {
+              "component": {
+                "type": "string"
+              },
+              "pin": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "component"
+            ]
+          },
+          "net": {
+            "type": "string"
+          },
+          "apply": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_sch_wire_routed"
+      },
+      "category": "edit"
+    },
+    {
+      "name": "sch_create",
+      "description": "在立创EDA 新建空白原理图并打开激活。EDA 新建命令可能有数秒异步延时，工具会自动轮询确认创建成功并找到新页面，避免误判失败重复创建。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "可选：原理图名称（不填由 EDA 自动命名）"
+          }
+        }
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_sch_create"
+      },
+      "category": "modify"
+    },
+    {
+      "name": "pcb_drc",
+      "description": "对当前激活 PCB 运行设计规则检查。verbose=true 返回详细错误数组。需激活 PCB 文档，可能耗时。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "verbose": {
+            "type": "boolean",
+            "description": "返回详细错误列表"
+          },
+          "timeoutMs": {
+            "type": "number"
+          }
+        }
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_pcb_drc"
+      },
+      "category": "query"
+    },
+    {
+      "name": "pcb_read",
+      "description": "读取当前 PCB 概览：器件清单（位号/坐标/层）、网络列表、工程与文档状态（只读）。需激活 PCB 文档。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_pcb_read"
+      },
+      "category": "query"
+    },
+    {
+      "name": "pcb_place_component",
+      "description": "在 PCB 坐标 (x,y) 放置器件（先 lib_search 拿 UUID）。坐标默认 mm 自动换算 mil，可传 unit=mil。需激活 PCB 文档。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "deviceUuid": {
+            "type": "string"
+          },
+          "libraryUuid": {
+            "type": "string"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "layer": {
+            "type": "number",
+            "description": "层号默认1顶层"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "mm",
+              "mil"
+            ]
+          },
+          "rotation": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "deviceUuid",
+          "libraryUuid",
+          "x",
+          "y"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_pcb_place_component"
+      },
+      "category": "modify"
+    },
+    {
+      "name": "pcb_net",
+      "description": "列出当前 PCB 全部网络名（最多 200）。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_pcb_net"
+      },
+      "category": "query"
+    },
+    {
+      "name": "pcb_modify",
+      "description": "按 primitiveId 移动/旋转 PCB 器件（异步模式）。坐标默认 mm。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "primitiveId": {
+            "type": "string"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "rotation": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "primitiveId"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_pcb_modify"
+      },
+      "category": "modify"
+    },
+    {
+      "name": "export_gerber",
+      "description": "导出当前 PCB 的 Gerber（BETA，可能较慢）。需激活 PCB。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string"
+          }
+        }
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_export_gerber"
+      },
+      "category": "modify"
+    },
+    {
+      "name": "export_bom",
+      "description": "导出 BOM（xlsx/csv，BETA）。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string"
+          },
+          "fileType": {
+            "type": "string",
+            "enum": [
+              "xlsx",
+              "csv"
+            ]
+          }
+        }
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_export_bom"
+      },
+      "category": "modify"
+    },
+    {
+      "name": "confirm",
+      "description": "在立创EDA 弹确认框等用户点确定/取消。破坏性操作（删除/覆盖/丢弃未保存）前先问用户。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_confirm"
+      },
+      "category": "modify"
+    },
+    {
+      "name": "screenshot",
+      "description": "截取当前 EDA 画面返回 base64（BETA，超大画面会被截断）。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_screenshot"
+      },
+      "category": "query"
+    }
+  ],
+  "commands": [
+    {
+      "id": "status",
+      "title": "刷新连接状态",
+      "icon": "refresh",
+      "kind": "action",
+      "placement": "toolbar.action",
+      "transport": "mcp",
+      "mcp": {
+        "server": "easyeda",
+        "tool": "easyeda_status"
+      },
+      "hidden": true
+    },
+    {
+      "id": "wizard",
+      "title": "扩展导入向导",
+      "icon": "wand",
+      "kind": "open-view",
+      "view": "import-wizard",
+      "placement": "toolbar.action",
+      "description": "打开立创EDA 扩展导入向导（分步安装桥接扩展）",
+      "hidden": true
+    }
+  ],
+  "views": [
+    {
+      "id": "status",
+      "title": "立创EDA 状态",
+      "icon": "plug",
+      "slot": "sidebar",
+      "type": "webview",
+      "entry": "ui/status.html"
+    },
+    {
+      "id": "import-wizard",
+      "title": "扩展导入向导",
+      "icon": "wand",
+      "slot": "sidebar",
+      "type": "webview",
+      "entry": "ui/wizard.html"
+    }
+  ],
+  "skills": [
+    {
+      "name": "立创EDA",
+      "description": "控制立创EDA(EasyEDA)做原理图/PCB 设计：连接桥、查工程/文档状态、搜器件库、放件、加网络标记、DRC、执行任意 API。",
+      "prompt": "## 立创EDA 设计助手\n\n你在帮助用户操作立创EDA（EasyEDA 专业版）。遵守以下工作流：\n\n0. **重新布局/整理原理图 → 首选 plugin_easyeda_sch_redesign**：一次调用完成「主IC居中+VCC上/GND下+外围贴脚+留通道+自动布线」，不要逐条 modify/wire。它自动识别核心、布局、布线、验证。用户说\"重新摆放/重新布局/整理/接线\"就用它。只有它不满足时才用 plan_layout/wire_routed 细化。\n1. **先查连接**：调用 plugin_easyeda_status 确认 EDA 已连接（edaConnected=true）。未连接 → 提示用户：① 确认立创EDA 已打开；② 在立创EDA「高级→扩展管理器」导入插件目录 assets/ 里的 triecode-easyeda-gateway_v1.0.0.eext，并勾选「允许外部交互」；③ 等 1-2 秒桥自动发现。\n2. **查文档状态**：任何 PCB/原理图操作前调用 plugin_easyeda_document_state（带 want），确认工程已打开、文档类型正确。类型不匹配时提示用户先切换文档，不要硬操作。\n3. **单位**：PCB 用 mil（1mm≈39.37），原理图用 sch（1 单位=0.01inch=10mil，1mm≈3.937）。**放件坐标默认按 mm 理解**（用户口头坐标通常是毫米），要 sch/mil 才显式传 unit。拿不准用 plugin_easyeda_convert。\n4. **搜器件再放件**：先 plugin_easyeda_lib_search 拿到 deviceUuid+libraryUuid，再 plugin_easyeda_sch_place_component 放置。\n5. **建图/开文档用高层工具**：新建原理图用 plugin_easyeda_sch_create（自动激活+防重复），开已有文档用 plugin_easyeda_doc_open。**立创EDA 新建/打开命令有数秒异步延时，工具已内置轮询确认，不要因为它慢就重复调用**（会重复建图！）。复杂 API 再用 plugin_easyeda_doc_search 查签名 + plugin_easyeda_execute。execute 是任意代码，务必先确认意图。\n6. **PCB 操作**：激活 PCB 文档后可用 plugin_easyeda_pcb_read（读板/器件/网络）、plugin_easyeda_pcb_place_component（放件）、plugin_easyeda_pcb_modify（移动/旋转）、plugin_easyeda_pcb_net、plugin_easyeda_pcb_drc。PCB 坐标默认 mm（自动换算 mil）。导出用 plugin_easyeda_export_gerber/bom（BETA）。\n7. **破坏性操作先问用户**：删除/覆盖/打开工程丢弃未保存修改前，先用 plugin_easyeda_confirm 弹出确认框，等用户点头再执行。\n8. **其他**：新建工程 plugin_easyeda_project_create；保存 plugin_easyeda_document_save；立创商城编号查器件 plugin_easyeda_lib_get_by_lcsc；符号/封装库 plugin_easyeda_lib_search_symbol/footprint；截图 plugin_easyeda_screenshot（BETA）。\n9. **打开工程**：plugin_easyeda_project_open 会丢弃未保存修改，先提醒用户保存。\n\n典型场景：\n- 摆最小系统：document_state(want=SCHEMATIC_PAGE) → lib_search 搜 STM32/晶振/电容 → sch_place_component 逐个放 → sch_add_net_flag 标 Power(电源)/Ground(地) 网络标记。\n- 检查 PCB：document_state(want=PCB) → pcb_drc。\n- 读工程：project_info / sch_list。\n\nEDA 未连接时不要假装成功——如实告诉用户桥/扩展状态。\n\n**画图美观规范（防重叠/防杂乱）**：\n- **放置后必查重叠**：每次放/移器件后用 plugin_easyeda_sch_list 看 overlaps（重叠对）；有重叠就 plugin_easyeda_sch_modify 挪开，**器件间留出间距**（参考各自的 bbox 尺寸），不要叠着、不要紧贴到看不清。\n- **方向纪律**：rotation 保持 0（正立），除非布局明确需要（如排插、极性件）才旋转/镜像。\n- **规划布局**：批量放件前先用 sch_list 看现有器件位置和 bbox，按网格/区域规划，避免拍脑袋坐标导致叠在一起。\n- **布线用真实引脚坐标**：sch_place_component / sch_modify / sch_get_pins 返回的 pins 就是精确引脚坐标，直接拿来做 sch_wire 端点；不要自己估算。\n\n**重排/摆放规范（强制用布局引擎，禁止手写坐标）**：\n- **摆放秩序**：总体从上到下、从左到右排布；电源（VCC/+5V）相关放上方、地（GND）放下方；信号流方向一致（如左进右出）。\n- **旋转减绕线**：元件该旋转就旋转（如电容竖放 270° 让 VCC 端朝上、GND 端朝下），旋转能明显缩短导线就走旋转，不必死守正立。\n- **任何「重新摆放 / 重排 / 整理 / 移动元器件」必须第一步调 plugin_easyeda_sch_plan_layout**——坐标由确定性引擎计算并保证不重叠，这是唯一允许的摆放方式。**最简调用只要 `{mode:\"central-lr\", core:\"U1\", layout:{apply:true}}`**：引擎会自动从网表连通性推断贴脚（哪个电容贴哪个引脚），把相关器件摆一起。要精细控制再加 anchors:[{s:\"C3\",p:\"1\",t:\"U1\",tp:\"RST\"}] 贴指定脚、groups flow 排信号链、netFlags 定标记方向。\n- **绝对禁止**用 sch_modify 自己心算坐标摆放（历史教训：器件叠进芯片、标记压本体）。plan_layout 返回 violations（overlaps/netflagsInsideParts）若不为空，**调整意图后重新调 plan_layout**，不要手动微调坐标。\n- 放置后调 plugin_easyeda_sch_verify_layout 确认 ok:true 才继续接线。\n- **单位**：plan_layout 返回 placements 已是 sch 单位；只有 execute/sch_modify 手工操作时才需显式 unit=sch（默认 mm）。\n\n**布线规范（强制用确定性绕障布线，禁止手写折线）**：\n- **多点网络用 wire_net**（Steiner 树一次连全部端点），两点用 wire_routed；**画完必调 verify_wiring 自证电气正确**（ok=false 先 wire_repair 自动拆线重布，再 verify）。\n- **重排前先删旧线**：调 plugin_easyeda_sch_wire_delete 删除全部导线（立创导线无 .id 属性，手写 w.id 会静默失败），再 plan_layout 重排。\n- **先验证布局再布线**：plan_layout 返回后**先看 violations.ok**（ok=false 调整意图重调，**绝不先布线**）；布线前调 plugin_easyeda_sch_verify_layout 确认 ok:true（含 overlaps/netflagsInsideParts/pinOverlaps 全空）。\n- **布线一律用 plugin_easyeda_sch_wire_routed**（自动绕开元器件本体和其他无关引脚、自动选距目标最近的端——电容 AB 端等效选近端）。例：{from:{component:\"C1\"}, to:{component:\"U1\",pin:\"XTAL1\"}, net:\"XTAL1\"}。**禁止手写 sch_wire 坐标/execute 手画折线**（会穿元器件/穿无关引脚）。\n- 线必须绕开元器件和其他无关端点；若 wire_routed 返回\"找不到无碰撞路径\"，说明布局太挤——用 plan_layout 调整布局后再布，不要硬画。\n- 连不上/结果异常先检查 from/to 位号和引脚名，别反复删线重画。补充要点：\n- **返回 null 即失败**：EDA API 失败常返回 null/undefined，先校验再继续，别把 null 当成功。\n- **改图元用 toAsync 模式**：execute 里修改 PCB/原理图图元用 get(primitiveId) → toAsync() → setState_*(...) → await done()（pcb_modify/sch_modify 已封装常用移动/旋转，复杂修改才裸写）。\n- **多窗口**：有多个 EDA 窗口时，先用 plugin_easyeda_list_windows 确认，再 plugin_easyeda_select_window 指定当前操作窗口（活动窗口 = 用户当前看的，EDA 里切窗口会自动跟随）。\n- **扩展文件位置**：导入用的 .eext 在 %APPDATA%\\TrieCode\\plugins\\easyeda-toolchain\\assets\\triecode-easyeda-gateway_v1.0.0.eext。"
+    }
+  ]
+}

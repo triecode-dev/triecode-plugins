@@ -1,0 +1,14 @@
+# 依赖（全局 .gitignore 已含 node_modules/，这里显式兜底）
+node_modules/
+
+# 构建产物（运行时用 assets/*.eext 与 server/dist/server.cjs，已随包提交；
+# 中间产物 extension/dist / extension/build 不提交）
+extension/dist/
+extension/build/
+
+# 打包自产物（zip 由 scripts/build-plugin-zip.mjs 生成，部署用 backend/plugins-dist 那份）
+easyeda-toolchain.zip
+
+# TypeScript 增量缓存 / 临时文件
+*.tsbuildinfo
+.e2e-smoke.mjs

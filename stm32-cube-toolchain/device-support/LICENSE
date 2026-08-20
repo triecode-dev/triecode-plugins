@@ -1,0 +1,34 @@
+# device-support 器件支持文件 — 来源与许可
+
+本目录为 STM32 裸机脚手架提供器件支持（CMSIS 器件头、系统初始化、启动文件）。
+文件来源与许可如下，随「STM32Cube 工具链」插件分发（作为软件产品的一部分）。
+
+## ST 器件文件（f1/、f4/ 下的 stm32f1xx.h、stm32f103xb.h、stm32f4xx.h、
+## stm32f401xc.h、stm32f411xe.h、system_stm32f1xx.[ch]、system_stm32f4xx.[ch]、
+## startup_stm32f1*.s、以及基于 ST 模板修改的链接脚本 *.ld）
+
+来源：STMicroelectronics 官方仓库（master 分支，2026-08 获取）
+  - cmsis_device_f1: https://github.com/STMicroelectronics/cmsis_device_f1
+  - cmsis_device_f4: https://github.com/STMicroelectronics/cmsis_device_f4
+  - STM32CubeF1:     https://github.com/STMicroelectronics/STM32CubeF1 （CMSIS Core 头文件）
+
+许可：ST 软件许可协议（SLA0044 及 STM32Cube 条款）——允许在软件产品中复制/分发
+（含修改），需保留版权与出处声明。不得脱离本插件单独再分发。完整条款见：
+  https://www.st.com/resource/en/license_agreement/software_license_agreement_ultimate-liberty-stmicroelectronics-sla0044.pdf
+
+## ARM CMSIS Core（common/cmsis/ 下的 core_cm3.h、core_cm4.h、cmsis_compiler.h、
+## cmsis_gcc.h、cmsis_version.h、mpu_armv7.h、cmsis_armcc.h、cmsis_armclang.h、cmsis_iccarm.h）
+
+来源：STM32CubeF1 仓库 Drivers/CMSIS/Core/Include（与器件文件同版本发布周期保持一致）。
+许可：Apache License 2.0（ARM CMSIS），版权归 ARM Ltd. 及贡献者。
+  https://github.com/ARM-software/CMSIS_5
+
+## 链接脚本（stm32f103xb_flash.ld 等）
+
+基于 STM32CubeF1 官方 STM32F103XB_FLASH.ld 模板修改（仅按目标 MCU 内存映射调整 MEMORY/_estack，
+C8:64K/20K · F401CC:256K/64K · F411CE:512K/128K），结构沿用 Ac6/ST 模板。
+
+## 商用提示
+
+商用分发请遵守上述 ST SLA0044 与 Apache-2.0 条款的再分发要求（保留版权声明、
+不替换许可文本、明示修改）。

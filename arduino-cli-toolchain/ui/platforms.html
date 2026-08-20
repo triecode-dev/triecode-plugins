@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>平台管理</title>
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; padding: 14px; color: #1f2937; background: #fff; overflow-x: hidden; }
+  /* 搜索行：输入框可收缩让位（面板拖窄不产生 iframe 水平滚动），按钮不压缩不换行 */
+  #q { flex: 1 1 auto; min-width: 0; width: auto; }
+  .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 12px; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid #f3f4f6; }
+  .row:last-child { border-bottom: none; }
+  .row > span { flex: 1; min-width: 0; }
+  .row .ctrl { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  input { font-size: 12px; padding: 5px 8px; border: 1px solid #d1d5db; border-radius: 6px; width: 100%; box-sizing: border-box; }
+  button { font-size: 12px; padding: 5px 12px; border-radius: 6px; border: 1px solid #2563eb; background: #2563eb; color: #fff; cursor: pointer; white-space: nowrap; }
+  button:disabled { opacity: .5; cursor: default; }
+  .ver { color: #6b7280; font-size: 11px; }
+  .progress { width: 100%; height: 6px; background: #f3f4f6; border-radius: 3px; overflow: hidden; }
+  .bar { height: 100%; background: #2563eb; width: 0; transition: width .2s; }
+  .empty { color: #9ca3af; font-size: 12px; padding: 8px 0; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div style="display:flex; gap:6px; margin-bottom:8px;">
+      <input id="q" placeholder="搜索平台，如 arduino、esp32…" />
+      <button id="searchBtn" style="flex-shrink:0;">搜索</button>
+    </div>
+    <div id="searchResults"></div>
+  </div>
+
+  <div class="card">
+    <b>已安装平台</b>
+    <div id="installed"></div>
+  </div>
+
+  <script>
+    // ── host.invoke 协议客户端（与宿主双向 postMessage，P4） ──
+    var nextId = 1, pending = {};
+    function send(method, args) {
+      return new Promise(function (resolve, reject) {
+        var id = 'm' + (nextId++);
+        pending[id] = { resolve: resolve, reject: reject };
+        window.parent.postMessage({ type: 'host.invoke', id: id, method: method, args: args || {} }, '*');
+      });
+    }
+    function renderProgress(id, percent, line) {
+      var row = document.querySelector('.row[data-id="' + cssEscape(id) + '"]');
+      if (!row) return;
+      var bar = row.querySelector('.bar'), txt = row.querySelector('.prog');
+      if (bar) bar.style.width = (percent != null ? percent : 0) + '%';
+      if (txt) txt.textContent = line || (percent != null ? percent + '%' : '');
+    }
+    window.addEventListener('message', function (e) {
+      var d = e.data;
+      if (!d || typeof d !== 'object') return;
+      if (d.type === 'host.invoke.result') {
+        var p = pending[d.id];
+        if (!p) return; delete pending[d.id];
+        if (d.ok) p.resolve(d.data); else p.reject(new Error(d.error || 'unknown'));
+      } else if (d.type === 'state.push' && d.key === 'core:installProgress') {
+        var v = d.value || {};
+        if (v.id) renderProgress(v.id, v.percent, v.line || v.message);
+      }
+    });
+    window.parent.postMessage({ type: 'ready' }, '*');
+    window.parent.postMessage({ type: 'state.subscribe', events: ['core:installProgress'] }, '*');
+
+    function escapeHtml(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+    function cssEscape(s) {
+      // data-id 用于 CSS 选择器：转义引号与反斜杠即可（平台 id 通常安全）
+      return String(s).replace(/"/g, '\\"').replace(/\\/g, '\\\\');
+    }
+
+    // ── 已装列表 ──
+    function renderInstalled(list) {
+      var el = document.getElementById('installed');
+      if (!list || list.length === 0) { el.innerHTML = '<div class="empty">暂无已安装平台</div>'; return; }
+      el.innerHTML = list.map(function (p) {
+        return '<div class="row" data-id="' + escapeHtml(p.id) + '"><span><b>' + escapeHtml(p.name) + '</b> <span class="ver">v' + escapeHtml(p.installed || '') + '</span></span></div>';
+      }).join('');
+    }
+    function loadInstalled() {
+      send('core:list').then(renderInstalled).catch(function (e) {
+        document.getElementById('installed').innerHTML = '<div class="empty">加载失败：' + escapeHtml(e.message) + '</div>';
+      });
+    }
+
+    // ── 搜索 + 安装 ──
+    function renderSearch(list) {
+      var el = document.getElementById('searchResults');
+      if (!list || list.length === 0) { el.innerHTML = '<div class="empty">无匹配结果</div>'; return; }
+      el.innerHTML = list.map(function (p) {
+        return '<div class="row" data-id="' + escapeHtml(p.id) + '">'
+          + '<span><b>' + escapeHtml(p.name) + '</b> <span class="ver">' + escapeHtml((p.architectures || []).join(', ')) + '</span></span>'
+          + '<div class="ctrl"><button data-install="' + escapeHtml(p.id) + '">安装</button><span class="prog ver"></span></div>'
+          + '<div class="progress"><div class="bar"></div></div>'
+          + '</div>';
+      }).join('');
+    }
+    function doSearch() {
+      var q = document.getElementById('q').value.trim();
+      if (q.length < 2) return;
+      send('core:search', { query: q }).then(renderSearch).catch(function (e) {
+        document.getElementById('searchResults').innerHTML = '<div class="empty">搜索失败：' + escapeHtml(e.message) + '</div>';
+      });
+    }
+    document.getElementById('searchBtn').addEventListener('click', doSearch);
+    document.getElementById('q').addEventListener('keydown', function (e) { if (e.key === 'Enter') doSearch(); });
+    document.getElementById('searchResults').addEventListener('click', function (e) {
+      var btn = e.target.closest('button[data-install]');
+      if (!btn) return;
+      var id = btn.getAttribute('data-install');
+      btn.disabled = true;
+      btn.textContent = '安装中…';
+      send('core:installWithProgress', { id: id })
+        .then(function () {
+          btn.textContent = '✓ 完成';
+          setTimeout(loadInstalled, 800);
+        })
+        .catch(function (err) { btn.textContent = '失败'; alert('安装失败：' + err.message); });
+    });
+
+    loadInstalled();
+  </script>
+</body>
+</html>

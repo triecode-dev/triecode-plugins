@@ -1,0 +1,80 @@
+{
+  "id": "plugin-dev-toolchain",
+  "name": "插件开发工具链",
+  "version": "0.1.1",
+  "description": "让 AI 帮你创建 TrieCode 插件：描述功能 → 生成骨架 → 校验 → 安装到本地。3 个 AI 工具（plugin_dev_create / validate / install）+ Skill「创建插件」+ 「TrieCode 插件」项目类型脚手架。",
+  "developer": "TrieCode",
+  "icon": "🧩",
+  "category": "AI 工具",
+  "capabilities": ["tools", "skills"],
+  "projectTypes": [
+    {
+      "id": "plugin-dev",
+      "title": "TrieCode 插件",
+      "icon": "🧩",
+      "description": "新建 TrieCode 插件项目：plugin.json + README 骨架（可让 AI 完善工具/命令/视图）",
+      "scaffold": [
+        {
+          "file": "plugin.json",
+          "content": "{\n  \"id\": \"my-plugin\",\n  \"name\": \"{name}\",\n  \"version\": \"0.1.0\",\n  \"developer\": \"\",\n  \"icon\": \"🧩\",\n  \"description\": \"编辑此 manifest 定义你的插件（工具/命令/视图，规范见官网「插件开发」文档）\",\n  \"tools\": []\n}\n"
+        },
+        {
+          "file": "README.md",
+          "content": "# {name}\n\nTrieCode 插件。编辑 plugin.json 声明工具/命令/视图，完成后在「插件管理 → 从文件夹安装」安装，或让 AI 调 plugin_dev_install。\n"
+        }
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "name": "plugin_dev_create",
+      "description": "创建 TrieCode 插件骨架：生成 plugin.json（最小 manifest + 示例 cli 工具）+ README.md。参数 dir（工作区内目录）、id（kebab-case 唯一）、name、description、developer、icon。生成后用 write_file 完善 manifest，再调 plugin_dev_validate 校验、plugin_dev_install 安装。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "dir": { "type": "string", "description": "插件目录（工作区内路径，建议用插件 id，如 my-toolchain）" },
+          "id": { "type": "string", "description": "插件 id，kebab-case（如 my-toolchain）" },
+          "name": { "type": "string", "description": "插件显示名（如 我的工具链）" },
+          "description": { "type": "string", "description": "插件功能描述" },
+          "developer": { "type": "string", "description": "开发者名（可选）" },
+          "icon": { "type": "string", "description": "图标 emoji，如 🔧（可选）" }
+        },
+        "required": ["dir", "id", "name"]
+      },
+      "transport": "internal",
+      "internal": { "service": "pluginDev", "method": "scaffold" },
+      "category": "create"
+    },
+    {
+      "name": "plugin_dev_validate",
+      "description": "校验插件目录的 plugin.json 是否合规（id kebab-case/name/version/tools transport 等，validateManifest）。参数 dir。返回 ✅ 合规或错误列表。",
+      "parameters": {
+        "type": "object",
+        "properties": { "dir": { "type": "string", "description": "插件目录" } },
+        "required": ["dir"]
+      },
+      "transport": "internal",
+      "internal": { "service": "pluginDev", "method": "validate" },
+      "category": "query"
+    },
+    {
+      "name": "plugin_dev_install",
+      "description": "安装本地插件目录到软件（先校验 manifest 合规，通过才安装）。参数 dir。安装后到「插件管理 → 已安装」启用即可使用。",
+      "parameters": {
+        "type": "object",
+        "properties": { "dir": { "type": "string", "description": "插件目录" } },
+        "required": ["dir"]
+      },
+      "transport": "internal",
+      "internal": { "service": "pluginDev", "method": "install" },
+      "category": "modify"
+    }
+  ],
+  "skills": [
+    {
+      "name": "创建插件",
+      "description": "引导 AI 创建 TrieCode 插件并安装到本地",
+      "prompt": "当用户想创建/开发 TrieCode 插件时，完全由 AI 主导，每个决策点向用户确认（不确定处主动问，不擅自假设）：\n1. 了解需求：问清楚插件功能、需要的工具/命令/视图、集成什么外部程序或 API；不确定处追问\n2. 定基础并告知用户：id（kebab-case 全局唯一，如 my-toolchain）、name（显示名）、icon（emoji）、description\n3. 选 transport 通道（结合需求选，向用户说明选择）：\n   - cli：调用外部命令/脚本（command 数组 + 参数占位符 {argName}/{settings.<key>}/{projectPath} 等）\n   - internal：复用宿主标准能力（arduinoCli/serialport/serialLog/skills/pluginDev 等，声明 internal:{service,method}）\n   - http：调用 REST API（url + fetch）\n   - grpc：自带 .proto 的动态 proto\n   - mcp：调用本插件声明的 MCP 服务器工具\n   - backend：插件自声明 stdio 后端（JSON-RPC）\n4. 调 plugin_dev_create 生成骨架（dir=插件 id）\n5. 用 write_file 完善 plugin.json：按需加 tools/commands/projectTypes/capabilities/settings；有界面则加 ui/*.html（webview，两段式：顶部选项卡 + 内容，200-480px 拖拽不变形）\n6. 调 plugin_dev_validate 校验，有错则修正直到 ✅\n7. **问用户「是否安装到本地？」**，确认后调 plugin_dev_install\n8. 安装成功后**问用户「是否立即启用？」**，确认后调 plugin_start（或提示到「插件管理 → 已安装」启用）\n9. 总结插件能力与用法\n规范要点：插件 id 须 kebab-case；工具名自动带 plugin_{id}_ 前缀；工具 description 用一句话说清做什么；涉及删除/下单等不可逆操作前需用户确认。参考范例：可 read_file 查看 %APPDATA%\\TrieCode\\plugins\\ 下已安装插件的 plugin.json（如 arduino-cli-toolchain 用 internal、wokwi-simulator 用 cli、browser-toolchain 用 mcp），照其 transport/占位符范式写。"
+    }
+  ]
+}

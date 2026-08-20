@@ -1,0 +1,731 @@
+{
+  "id": "arduino-cli-toolchain",
+  "name": "Arduino CLI 工具链",
+  "version": "0.3.8",
+  "description": "Arduino CLI 工具链插件：声明式工具后端（arduino-cli daemon，随插件启用自动启动），编译 / 烧录 / 库管理 / 板卡 / 串口。工具经宿主标准能力通道（internal arduinoCli/serialport/serialLog/state）接入 Agent，插件零宿主特例。共用官方 %LOCALAPPDATA%\\Arduino15 编译链。",
+  "developer": "TrieCode",
+  "icon": "arduino",
+  "category": "嵌入式工具链",
+  "capabilities": {
+    "compile": {
+      "transport": "internal",
+      "service": "arduinoCli",
+      "method": "compile",
+      "output": "avr-gcc"
+    },
+    "upload": {
+      "transport": "internal",
+      "service": "arduinoCli",
+      "method": "upload"
+    },
+    "board-manage": {
+      "transport": "internal",
+      "service": "arduinoCli",
+      "method": "board.search"
+    },
+    "board-select": {
+      "transport": "internal",
+      "service": "arduinoCli",
+      "method": "select_board"
+    },
+    "library-manage": {
+      "transport": "internal",
+      "service": "arduinoCli",
+      "method": "library.search"
+    },
+    "platform-install": {
+      "transport": "internal",
+      "service": "arduinoCli",
+      "method": "core.list"
+    }
+  },
+  "views": [
+    {
+      "id": "platforms",
+      "title": "平台管理",
+      "icon": "package",
+      "slot": "sidebar",
+      "type": "webview",
+      "entry": "ui/platforms.html",
+      "events": [
+        "core:installProgress"
+      ]
+    },
+    {
+      "id": "libraries",
+      "title": "库管理",
+      "icon": "book-open",
+      "slot": "sidebar",
+      "type": "webview",
+      "entry": "ui/libraries.html",
+      "events": [
+        "lib:installProgress"
+      ]
+    }
+  ],
+  "devicePanel": {
+    "id": "arduino-board",
+    "title": "Arduino 设备",
+    "selectors": [
+      {
+        "id": "board",
+        "title": "开发板",
+        "source": {
+          "transport": "internal",
+          "service": "arduinoCli",
+          "method": "board.search"
+        },
+        "searchable": true,
+        "key": "fqbn",
+        "placeholder": "搜索开发板…"
+      },
+      {
+        "id": "port",
+        "title": "端口",
+        "source": {
+          "transport": "internal",
+          "service": "serialport",
+          "method": "list"
+        },
+        "key": "port"
+      }
+    ],
+    "optionLoader": {
+      "transport": "internal",
+      "service": "arduinoCli",
+      "method": "board.details"
+    },
+    "optionSet": {
+      "transport": "internal",
+      "service": "state",
+      "method": "setBoardOption"
+    }
+  },
+  "projectTypes": [
+    {
+      "id": "arduino",
+      "title": "Arduino 项目",
+      "icon": "arduino",
+      "description": "标准 Arduino 工程（.ino）",
+      "scaffold": [
+        {
+          "file": "{name}.ino",
+          "content": "void setup() {\n  // put your setup code here\n}\n\nvoid loop() {\n  // put your main code here\n}\n"
+        }
+      ],
+      "capabilities": [
+        "compile",
+        "upload",
+        "board-manage",
+        "board-select",
+        "library-manage"
+      ]
+    }
+  ],
+  "skills": [
+    {
+      "name": "烧录前检查",
+      "description": "编译 + 检查板卡/端口选择，确认无误再烧录",
+      "prompt": "请按顺序完成烧录前的完整检查：\n1. read_file 当前项目 {sketchName} 的源码，检查明显错误\n2. 确认已选择开发板（select_board）和端口（select_port，当前 {port}）\n3. 用 compile 编译一次，确保无 error\n4. 编译通过后先向用户确认「编译通过，是否烧录？」，确认后再 upload\n5. 烧录成功后用 serial_log_open + serial_log 打开串口确认程序正常运行"
+    },
+    {
+      "name": "串口日志分析",
+      "description": "打开串口后台日志，读取并分析运行输出",
+      "prompt": "1. 用 serial_log_open 打开当前板子的串口后台日志（端口 {port}，默认 115200）\n2. 让固件运行一段时间，用 serial_log 读取最近日志\n3. 分析输出中的异常/错误信息，定位问题根因\n4. 如需检索特定关键字用 serial_grep\n5. 分析完成后用 serial_log_close 释放串口"
+    }
+  ],
+  "tools": [
+    {
+      "name": "compile",
+      "description": "Compile/verify a sketch. Uses the currently selected board. IMPORTANT: call select_board first to pick a board (it sets the standard FQBN); fqbn must be the standard format like arduino:avr:uno, NOT the display name ('Arduino UNO'). Missing platform cores auto-install on first compile.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "fqbn": {
+            "type": "string",
+            "description": "Optional standard FQBN (e.g. arduino:avr:uno); uses selected board if omitted. NOT the board display name — use select_board to pick a board first."
+          },
+          "sketch_path": {
+            "type": "string",
+            "description": "Optional sketch folder name in workspace - uses currently open sketch if omitted"
+          }
+        }
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "execute",
+      "internal": {
+        "service": "arduinoCli",
+        "method": "compile"
+      }
+    },
+    {
+      "name": "upload",
+      "description": "Compile and upload to the currently selected board and port. IMPORTANT: call select_board (sets standard FQBN) and select_port first; fqbn must be standard format like arduino:avr:uno, NOT the display name ('Arduino UNO').",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "fqbn": {
+            "type": "string",
+            "description": "Optional standard FQBN (e.g. arduino:avr:uno); uses selected board if omitted. NOT the board display name — use select_board to pick a board first."
+          },
+          "port": {
+            "type": "string",
+            "description": "Optional - uses selected port if omitted"
+          },
+          "sketch_path": {
+            "type": "string",
+            "description": "Optional sketch folder name in workspace"
+          }
+        }
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "execute",
+      "internal": {
+        "service": "arduinoCli",
+        "method": "upload"
+      }
+    },
+    {
+      "name": "get_board_info",
+      "description": "Get detailed information about the selected board: specifications, architecture, pinout, memory, voltage.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "fqbn": {
+            "type": "string",
+            "description": "Optional - uses selected board if omitted"
+          }
+        }
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "query",
+      "internal": {
+        "service": "arduinoCli",
+        "method": "board.details"
+      }
+    },
+    {
+      "name": "install_library",
+      "description": "Install an Arduino library by name from the Arduino Library Manager.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Library name to install"
+          },
+          "version": {
+            "type": "string",
+            "description": "Optional specific version"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "execute",
+      "internal": {
+        "service": "arduinoCli",
+        "method": "library.install"
+      }
+    },
+    {
+      "name": "uninstall_library",
+      "description": "Uninstall a previously installed Arduino library by name (e.g. \"Servo\"). Use this when the user asks to remove/delete a library. Prefer over manually deleting the library folder. Call list_installed_libraries first if unsure whether it is installed.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Library name to uninstall"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "delete",
+      "internal": {
+        "service": "arduinoCli",
+        "method": "library.uninstall"
+      }
+    },
+    {
+      "name": "list_installed_libraries",
+      "description": "List all installed Arduino libraries with their versions.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "query",
+      "internal": {
+        "service": "arduinoCli",
+        "method": "library.list"
+      }
+    },
+    {
+      "name": "search_libraries",
+      "description": "Search the Arduino Library Manager for libraries matching a keyword. Returns up to 20 results with name, version, author, and description.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search keyword (e.g. \"OLED\", \"WiFi\", \"servo\")"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "query",
+      "internal": {
+        "service": "arduinoCli",
+        "method": "library.search"
+      }
+    },
+    {
+      "name": "list_platforms",
+      "description": "List all installed Arduino development platforms (e.g. Arduino AVR, ESP32, STM32). Shows platform name, version, and architectures.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "query",
+      "internal": {
+        "service": "arduinoCli",
+        "method": "core.list"
+      }
+    },
+    {
+      "name": "install_platform",
+      "description": "Install an Arduino development platform (compiler toolchain), e.g. arduino:avr, esp32:esp32, esp8266:esp8266. Use when a compile fails with 'platform not installed'. First-time download may take a while.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "platform": { "type": "string", "description": "Platform ID, e.g. arduino:avr (vendor:architecture). Common: arduino:avr, arduino:samd, esp32:esp32, esp8266:esp8266." }
+        },
+        "required": ["platform"]
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "modify",
+      "internal": {
+        "service": "arduinoCli",
+        "method": "core.install"
+      }
+    },
+    {
+      "name": "uninstall_platform",
+      "description": "Uninstall an Arduino development platform, e.g. arduino:avr.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "platform": { "type": "string", "description": "Platform ID to remove, e.g. arduino:avr." }
+        },
+        "required": ["platform"]
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "modify",
+      "internal": {
+        "service": "arduinoCli",
+        "method": "core.uninstall"
+      }
+    },
+    {
+      "name": "search_boards",
+      "description": "Search for available development boards by name or keyword. Returns a list of matching boards WITHOUT selecting one. Use this to browse options, then use select_board to pick one.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search term (e.g. \"ESP32\", \"STM32\", \"Uno\", \"nano\")"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "query",
+      "internal": {
+        "service": "arduinoCli",
+        "method": "board.search"
+      }
+    },
+    {
+      "name": "select_board",
+      "description": "Select/change the current development board. Use \"query\" to search for a board by name — the first match will be selected. Use search_boards first if you need to browse all matching options before picking.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search term (board name). First match will be selected."
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "modify",
+      "internal": {
+        "service": "arduinoCli",
+        "method": "select_board"
+      }
+    },
+    {
+      "name": "list_ports",
+      "description": "List all available serial ports (COM ports) currently connected to the computer. Returns port path and manufacturer info.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "query",
+      "internal": {
+        "service": "serialport",
+        "method": "list"
+      }
+    },
+    {
+      "name": "select_port",
+      "description": "Select/change the serial port for uploading. Use \"query\" to search by port address or manufacturer name. Current port: {defaultPort}",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search term (e.g. \"COM3\", \"ttyUSB\", manufacturer name). First match wins."
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "modify",
+      "internal": {
+        "service": "serialport",
+        "method": "select"
+      }
+    },
+    {
+      "name": "set_board_option",
+      "description": "Set a board configuration option (e.g. Flash Frequency, Partition Scheme, CPU Frequency). Use get_board_info first to see available options and values. Only works for boards that have configurable options.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Option name, e.g. \"FlashFreq\", \"PartitionScheme\", \"CpuFrequency\""
+          },
+          "value": {
+            "type": "string",
+            "description": "Option value, e.g. \"80\", \"huge_app\", \"240\""
+          }
+        },
+        "required": [
+          "name",
+          "value"
+        ]
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "modify",
+      "internal": {
+        "service": "state",
+        "method": "setBoardOption"
+      }
+    },
+    {
+      "name": "serial_log_open",
+      "description": "Open a BACKGROUND serial monitor that continuously records the device serial output into a log buffer (solves \"AI cannot see live TTY\"). Use when the firmware prints logs (Serial.println) or when debugging runtime behavior. Then use serial_log / serial_grep to read it. Port defaults to the selected port. NOTE: while this is open the serial port is busy — upload/flash will pause it automatically.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "port": {
+            "type": "string",
+            "description": "Serial port (e.g. COM3). Defaults to selected port."
+          },
+          "baud": {
+            "type": "integer",
+            "description": "Baud rate. Default 115200."
+          }
+        }
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "execute",
+      "internal": {
+        "service": "serialLog",
+        "method": "open"
+      }
+    },
+    {
+      "name": "serial_log",
+      "description": "Read the most recent lines from the background serial log (tail). Use to see what the firmware has printed. Requires serial_log_open first.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "port": {
+            "type": "string",
+            "description": "Serial port. Defaults to selected port."
+          },
+          "line": {
+            "type": "integer",
+            "description": "Number of lines to read. Default 50, max 500."
+          }
+        }
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "query",
+      "internal": {
+        "service": "serialLog",
+        "method": "tail"
+      }
+    },
+    {
+      "name": "serial_grep",
+      "description": "Search the background serial log for a keyword or regex (case-insensitive). Use to find specific log lines (errors, states, sensor values) without dumping the whole log.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "port": {
+            "type": "string",
+            "description": "Serial port. Defaults to selected port."
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Keyword or regex to search (e.g. \"error\", \"temp\", \"WiFi\")"
+          },
+          "max": {
+            "type": "integer",
+            "description": "Max results. Default 30."
+          }
+        },
+        "required": [
+          "pattern"
+        ]
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "query",
+      "internal": {
+        "service": "serialLog",
+        "method": "grep"
+      }
+    },
+    {
+      "name": "serial_send",
+      "description": "Send a string to the serial port (e.g. a CLI command, \"AT\", or an input the firmware expects). Requires serial_log_open on that port.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "port": {
+            "type": "string",
+            "description": "Serial port. Defaults to selected port."
+          },
+          "data": {
+            "type": "string",
+            "description": "String to send (a trailing newline is NOT added automatically)."
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "execute",
+      "internal": {
+        "service": "serialLog",
+        "method": "send"
+      }
+    },
+    {
+      "name": "serial_log_close",
+      "description": "Close the background serial log session and release the serial port. Use when done monitoring.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "port": {
+            "type": "string",
+            "description": "Serial port. Defaults to selected port."
+          }
+        }
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "execute",
+      "internal": {
+        "service": "serialLog",
+        "method": "close"
+      }
+    },
+    {
+      "name": "analyze_crash",
+      "description": "Analyze the serial log for crash signatures (ESP32 Guru Meditation/Backtrace, AVR/ARM HardFault, panic, assertion failed, segfault, stack overflow, watchdog, out of memory, heap corruption) and return matched log lines with a diagnosis. Requires serial_log_open + reproducing the crash.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "port": {
+            "type": "string",
+            "description": "Serial port whose log to analyze. Defaults to selected port."
+          }
+        }
+      },
+      "transport": "internal",
+      "projectTypes": [
+        "arduino",
+        "firmware"
+      ],
+      "category": "query",
+      "internal": {
+        "service": "serialLog",
+        "method": "analyzeCrash"
+      }
+    }
+  ],
+  "dependencies": [
+    {
+      "name": "arduino-cli",
+      "version": "1.5.1",
+      "url": "https://downloads.arduino.cc/arduino-cli/arduino-cli_1.5.1_Windows_64bit.zip",
+      "unzip": true
+    }
+  ],
+  "environment": {
+    "arduino": {
+      "additionalUrls": [
+        "https://jihulab.com/esp-mirror/espressif/arduino-esp32/-/raw/gh-pages/package_esp32_index_cn.json",
+        "https://static.llilii.cn/json/arduino/package_esp8266com_index.json"
+      ]
+    }
+  },
+  "settings": [
+    {
+      "id": "arduino",
+      "title": "开发板源",
+      "settings": [
+        {
+          "key": "environment.arduino.additionalUrls",
+          "title": "开发板管理器附加地址",
+          "description": "第三方开发板包索引 URL（如 esp32/esp8266 镜像）。用户覆盖优先于 manifest 默认值；与官方 Arduino IDE 的板卡源自动去重合并。留空数组可清除默认源。",
+          "type": "urlArray",
+          "default": [
+            "https://jihulab.com/esp-mirror/espressif/arduino-esp32/-/raw/gh-pages/package_esp32_index_cn.json",
+            "https://static.llilii.cn/json/arduino/package_esp8266com_index.json"
+          ],
+          "restartRequired": true
+        }
+      ]
+    }
+  ],
+  "backends": [
+    {
+      "type": "grpc",
+      "command": "arduino-cli",
+      "port": 0,
+      "args": [
+        "daemon",
+        "--port",
+        "0",
+        "--daemonize",
+        "--max-grpc-recv-message-size",
+        "16777216"
+      ],
+      "readiness": {
+        "kind": "grpc",
+        "timeoutMs": 20000
+      }
+    }
+  ],
+  "activation": {
+    "projectTypes": [
+      "arduino",
+      "firmware"
+    ]
+  }
+}
