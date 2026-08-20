@@ -1,7 +1,7 @@
 {
   "id": "arduino-cli-toolchain",
   "name": "Arduino CLI 工具链",
-  "version": "0.3.9",
+  "version": "0.3.10",
   "description": "Arduino CLI 工具链插件：声明式工具后端（arduino-cli daemon，随插件启用自动启动），编译 / 烧录 / 库管理 / 板卡 / 串口。工具经宿主标准能力通道（internal arduinoCli/serialport/serialLog/state）接入 Agent，插件零宿主特例。共用官方 %LOCALAPPDATA%\\Arduino15 编译链。",
   "developer": "TrieCode",
   "icon": "arduino",
@@ -673,6 +673,7 @@
       "name": "arduino-cli",
       "version": "1.5.1",
       "url": "https://gitee.com/triecode/arduino-cli-mirror/releases/download/v1.5.1/arduino-cli_1.5.1_Windows_64bit.zip",
+      "mirrorUrl": "https://downloads.arduino.cc/arduino-cli/arduino-cli_1.5.1_Windows_64bit.zip",
       "unzip": true
     }
   ],
