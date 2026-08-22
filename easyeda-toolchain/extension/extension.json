@@ -4,14 +4,14 @@
 	"displayName": "TrieCode EDA 桥",
 	"description": "为 TrieCode 提供 WebSocket 网关桥接服务（基于立创官方 run-api-gateway 改进，Apache-2.0，原作者 JLCEDA）",
 	"version": "1.0.0",
-	"publisher": "TrieCode",
+	"publisher": "zhangerbo",
 	"engines": {
-		"eda": "~3.2.0"
+		"eda": "^3.2.0"
 	},
 	"license": "Apache-2.0",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/triecode/triecode-easyeda-gateway"
+		"url": "https://github.com/triecode-dev/triecode-plugins"
 	},
 	"categories": "Other",
 	"keywords": [
@@ -24,8 +24,8 @@
 	"images": {
 		"logo": "./images/logo.png"
 	},
-	"homepage": "https://github.com/triecode/triecode-easyeda-gateway",
-	"bugs": "https://github.com/triecode/triecode-easyeda-gateway/issues",
+	"homepage": "https://github.com/triecode-dev/triecode-plugins/tree/main/easyeda-toolchain/extension",
+	"bugs": "https://github.com/triecode-dev/triecode-plugins/issues",
 	"activationEvents": {
 		"onStartupFinished": true
 	},

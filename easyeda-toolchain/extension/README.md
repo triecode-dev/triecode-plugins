@@ -4,6 +4,12 @@
 
 > 本扩展基于官方 `run-api-gateway` fork 改造，受 **Apache-2.0** 约束，原作者 **JLCEDA**（见随包 `LICENSE` / `NOTICE`）。
 
+## 功能演示
+
+![功能演示示意图](images/demo.png)
+
+> 上图示意：扩展在立创EDA 内以「TrieCode EDA 桥」菜单常驻（含重新连接 / 停止连接 / 切换自动连接 / 关于），自动连接本地桥后在原理图画布中响应 AI 的读写操作；右侧为 TrieCode AI 侧调用 `easyeda_*` 工具、经桥执行并回传结果。
+
 ## 功能
 
 - 启动本地 WebSocket 桥（端口 49620–49629），只监听 `127.0.0.1`

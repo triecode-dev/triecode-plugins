@@ -1,25 +1,34 @@
 {
   "id": "browser-toolchain",
   "name": "浏览器自动化",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "给 AI 一个可控的真实浏览器：打开网页、点击、填表、抓取内容、截图——用于在线检索、查文档、以及调试本地 Web 应用（http://localhost）。经 Playwright MCP 接入，直接驱动系统已装的 Microsoft Edge（免下载浏览器内核）。v0.1.4：npx 下载走 npmmirror 国内镜像，无代理/没装 Node 电脑首次启动秒连。v0.1.3：无需预装 Node.js——系统有 Node（≥18）则用系统的，没有则自动下载便携 Node（国内 CDN）并用它启动。v0.1.2：启动注入 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 跳过内核下载，无代理网络不再卡在 CDN。",
   "developer": "TrieCode",
   "icon": "🌐",
   "category": "AI 工具",
-  "capabilities": ["mcp", "skills"],
+  "capabilities": [
+    "mcp",
+    "skills"
+  ],
   "dependencies": [
     {
       "name": "node",
       "version": "22.14.0",
       "url": "https://registry.npmmirror.com/-/binary/node/v22.14.0/node-v22.14.0-win-x64.zip",
-      "unzip": true
+      "unzip": true,
+      "sha256": "55b639295920b219bb2acbcfa00f90393a2789095b7323f79475c9f34795f217"
     }
   ],
   "mcpServers": [
     {
       "name": "browser",
       "command": "{node}",
-      "args": ["-y", "@playwright/mcp@latest", "--browser", "msedge"],
+      "args": [
+        "-y",
+        "@playwright/mcp@latest",
+        "--browser",
+        "msedge"
+      ],
       "env": {
         "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1",
         "NPM_CONFIG_REGISTRY": "https://registry.npmmirror.com"

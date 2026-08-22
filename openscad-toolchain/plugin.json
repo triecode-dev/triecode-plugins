@@ -1,0 +1,462 @@
+{
+  "id": "openscad-toolchain",
+  "name": "OpenSCAD 工具链",
+  "version": "0.1.1",
+  "description": "OpenSCAD 程序化建模：机械外壳/结构件/3D 打印件建模交给 AI——写 .scad → 渲染 STL/3MF（打印）/ PNG（AI 看图自纠）→ 切片。检测复用本机已装 OpenSCAD（openscad.com），内置 BOSL2 库。v0.1.1：左侧栏「在 OpenSCAD 中打开 / 导出 STL」按钮常显（不再要求已打开 openscad 项目）；无模型文件时点击给出明确提示；打开 GUI 修复远程/虚拟机窗口不显示（spawn 窗口标志）。",
+  "developer": "TrieCode",
+  "icon": "openscad",
+  "category": "3D 建模",
+  "activation": {
+    "projectTypes": [
+      "openscad"
+    ]
+  },
+  "projectDetection": {
+    "markers": [
+      {
+        "file": "*.scad"
+      }
+    ],
+    "type": "openscad"
+  },
+  "projectTypes": [
+    {
+      "id": "openscad",
+      "title": "OpenSCAD 项目",
+      "icon": "openscad",
+      "description": "OpenSCAD 程序化建模项目：一个参数化 .scad 脚本，用 AI 改常量/代码 → 预览 PNG 看图自纠 → 渲染导出 STL/3MF 供打印或切片",
+      "scaffold": [
+        {
+          "file": "{name}.scad",
+          "content": "// {name} — OpenSCAD 参数化模型（TrieCode 脚手架）\n// 顶层常量 = 可调参数；改完用 plugin_openscad-toolchain_preview 看图，定稿用 render 导出 STL/3MF。\nlength = 40;   // 长度 (mm)\nwidth  = 20;   // 宽度 (mm)\nheight = 10;   // 高度 (mm)\nwall   = 2;    // 壁厚 (mm)\n\nmodule box_body() {\n  // 倒角/螺纹等高级原语可用内置 BOSL2：include <BOSL2/std.scad> 后 cuboid(size, chamfer=) 等\n  cube([length, width, height], center = true);\n}\n\n// echo() 输出测量值（预览/渲染输出里可见，AI 自检用）\necho(str(\"dimensions: \", length, \"x\", width, \"x\", height, \" mm\"));\n\nbox_body();\n"
+        }
+      ]
+    }
+  ],
+  "detection": {
+    "envVars": [
+      "OPENSCAD_PATH"
+    ],
+    "pathGlobs": [
+      "%PROGRAMFILES%/OpenSCAD",
+      "%PROGRAMFILES(X86)%/OpenSCAD",
+      "%LOCALAPPDATA%/Programs/OpenSCAD"
+    ],
+    "validateFile": "openscad.com",
+    "portable": {
+      "depName": "openscad"
+    }
+  },
+  "tools": [
+    {
+      "name": "render",
+      "description": "把 .scad 模型渲染导出为 STL/3MF/AMF（3D 打印/切片用）。参数：file/out 均为**相对工作区**的路径（含项目目录前缀，与 read_file 同约定，如 model1/model1.scad → out=model1/box.stl）、format=--export-format 取值：binstl（STL 二进制，推荐）/asciistl（STL 文本）/3mf/amf（amf 为旧格式）。⚠️ 输出目录必须已存在——OpenSCAD 不自动建目录；要用 build/ 等子目录时先创建（terminal 或 write_file）。⚠️ 不支持 svg——3D 模型导 svg 会报错（svg 仅 2D 对象可导出），3D 轮廓预览用 preview 工具。无参数覆盖；单参数变体用 render_variant；多参数直接改 .scad 源码常量后重新渲染。输出若含 ERROR: 行或文件为空则失败，需修正 .scad。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": ".scad 文件相对工作区路径，含项目目录前缀（如 model1/model1.scad）"
+          },
+          "out": {
+            "type": "string",
+            "description": "输出路径含扩展名，相对工作区含项目目录前缀（推荐项目内如 model1/box.stl；用子目录如 model1/build/box.stl 需先创建该目录）"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "binstl",
+              "asciistl",
+              "3mf",
+              "amf"
+            ],
+            "description": "导出格式：binstl=STL二进制(推荐)/asciistl=STL文本/3mf/amf"
+          }
+        },
+        "required": [
+          "file",
+          "out",
+          "format"
+        ]
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "openscad"
+      ],
+      "category": "execute",
+      "cli": {
+        "command": [
+          "{settings.toolchain.active.path}/openscad.com",
+          "-o",
+          "{out}",
+          "--export-format",
+          "{format}",
+          "{file}"
+        ],
+        "env": {
+          "OPENSCADPATH": "{pluginDir}/lib"
+        },
+        "timeoutMs": 300000
+      }
+    },
+    {
+      "name": "render_variant",
+      "description": "带 -D 参数覆盖的渲染导出（单参数变体：把 .scad 顶层常量覆盖为另一值，如把 length=40 覆盖为 60 看变体）。参数：file/out 均为**相对工作区**路径（含项目目录前缀，如 model1/model1.scad → out=model1/box_l60.stl）、format=--export-format 取值（binstl/asciistl/3mf/amf，同 render）、d=-D 覆盖串 name=value（如 \"length=60\"，必填非空）。⚠️ 输出目录必须已存在（OpenSCAD 不自动建目录）；⚠️ 仅单参数覆盖；多参数覆盖请直接改 .scad 源码常量再 render。输出若含 ERROR: 行或文件为空则失败。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": ".scad 文件相对工作区路径，含项目目录前缀（如 model1/model1.scad）"
+          },
+          "out": {
+            "type": "string",
+            "description": "输出路径含扩展名，相对工作区含项目目录前缀（推荐项目内如 model1/box_l60.stl；用子目录需先创建）"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "binstl",
+              "asciistl",
+              "3mf",
+              "amf"
+            ],
+            "description": "导出格式：binstl=STL二进制(推荐)/asciistl=STL文本/3mf/amf"
+          },
+          "d": {
+            "type": "string",
+            "description": "-D 参数覆盖串，格式 name=value，如 \"length=60\"（必填非空）"
+          }
+        },
+        "required": [
+          "file",
+          "out",
+          "format",
+          "d"
+        ]
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "openscad"
+      ],
+      "category": "execute",
+      "cli": {
+        "command": [
+          "{settings.toolchain.active.path}/openscad.com",
+          "-o",
+          "{out}",
+          "--export-format",
+          "{format}",
+          "-D",
+          "{d}",
+          "{file}"
+        ],
+        "env": {
+          "OPENSCADPATH": "{pluginDir}/lib"
+        },
+        "timeoutMs": 300000
+      }
+    },
+    {
+      "name": "render_set",
+      "description": "用 customizer 参数文件渲染**多参数变体**（一次覆盖多个顶层常量，不改 .scad 源码）。参数：file=.scad 相对工作区路径、out=输出路径含扩展名（相对工作区，推荐项目内）、format=同 render（binstl/asciistl/3mf/amf）、params=customizer 参数文件相对工作区路径（JSON 格式 {\"parameterSets\":{\"Default\":{\"length\":60,\"width\":30}},\"fileFormatVersion\":\"1\"}，集名**必须**用 Default（-P Default））。⚠️ 输出目录需先存在。多组参数：写多个 params 文件各调一次（比 render_variant 的单 -D 更强）。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": ".scad 文件相对工作区路径，含项目目录前缀（如 model1/model1.scad）"
+          },
+          "out": {
+            "type": "string",
+            "description": "输出路径含扩展名，相对工作区含项目目录前缀（推荐项目内如 model1/box_v1.stl；用子目录需先创建）"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "binstl",
+              "asciistl",
+              "3mf",
+              "amf"
+            ],
+            "description": "导出格式：binstl=STL二进制(推荐)/asciistl/3mf/amf"
+          },
+          "params": {
+            "type": "string",
+            "description": "customizer 参数文件相对工作区路径（JSON：{\"parameterSets\":{\"Default\":{\"length\":60,\"width\":30}},\"fileFormatVersion\":\"1\"}，集名必须 Default）"
+          }
+        },
+        "required": [
+          "file",
+          "out",
+          "format",
+          "params"
+        ]
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "openscad"
+      ],
+      "category": "execute",
+      "cli": {
+        "command": [
+          "{settings.toolchain.active.path}/openscad.com",
+          "-o",
+          "{out}",
+          "--export-format",
+          "{format}",
+          "-p",
+          "{params}",
+          "-P",
+          "Default",
+          "{file}"
+        ],
+        "env": {
+          "OPENSCADPATH": "{pluginDir}/lib"
+        },
+        "timeoutMs": 300000
+      }
+    },
+    {
+      "name": "preview",
+      "description": "渲染 .scad 为三视角 PNG（front 前 / top 顶 / iso 轴测），输出 {out}_front.png / {out}_top.png / {out}_iso.png（相对工作区）。参数：file/out 均为**相对工作区**路径（含项目目录前缀，与 read_file 同约定，如 file=model1/model1.scad、out=model1/box → 生成 model1/box_front.png 等三张；⚠️ 输出目录必须已存在）。⚠️ 写入 3 张 PNG，复杂模型耗时可达数分钟。渲染后用 analyze_image(path=...) 逐张看图检查模型，改完重渲对比。文件里 echo() 的测量值出现在输出中供自检。任一视角失败（无该 PNG / 输出含 ERROR:）请重试或简化模型。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": ".scad 文件相对工作区路径，含项目目录前缀（如 model1/model1.scad）"
+          },
+          "out": {
+            "type": "string",
+            "description": "输出基础路径（不带扩展名），相对工作区含项目目录前缀（推荐项目内如 model1/box；用子目录需先创建）；生成 {out}_front.png / {out}_top.png / {out}_iso.png 三张"
+          }
+        },
+        "required": [
+          "file",
+          "out"
+        ]
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "openscad"
+      ],
+      "category": "modify",
+      "cli": {
+        "steps": [
+          {
+            "command": [
+              "{settings.toolchain.active.path}/openscad.com",
+              "-o",
+              "{out}_front.png",
+              "--render",
+              "--autocenter",
+              "--viewall",
+              "--imgsize",
+              "1024,1024",
+              "--projection",
+              "ortho",
+              "--camera",
+              "0,0,0,90,0,0,120",
+              "{file}"
+            ],
+            "env": {
+              "OPENSCADPATH": "{pluginDir}/lib"
+            },
+            "timeoutMs": 180000
+          },
+          {
+            "command": [
+              "{settings.toolchain.active.path}/openscad.com",
+              "-o",
+              "{out}_top.png",
+              "--render",
+              "--autocenter",
+              "--viewall",
+              "--imgsize",
+              "1024,1024",
+              "--projection",
+              "ortho",
+              "--camera",
+              "0,0,0,0,0,0,120",
+              "{file}"
+            ],
+            "env": {
+              "OPENSCADPATH": "{pluginDir}/lib"
+            },
+            "timeoutMs": 180000
+          },
+          {
+            "command": [
+              "{settings.toolchain.active.path}/openscad.com",
+              "-o",
+              "{out}_iso.png",
+              "--render",
+              "--autocenter",
+              "--viewall",
+              "--imgsize",
+              "1024,1024",
+              "--projection",
+              "ortho",
+              "--camera",
+              "0,0,0,60,0,35,120",
+              "{file}"
+            ],
+            "env": {
+              "OPENSCADPATH": "{pluginDir}/lib"
+            },
+            "timeoutMs": 180000
+          }
+        ],
+        "imageOutput": "{out}_front.png",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "validate",
+      "description": "快速检查 .scad 语法（导出 CSG 树，不完整渲染、不校验几何）+ 参数检查（--check-parameters：未定义变量/参数类型错输出 WARNING，如 \"Ignoring unknown variable\"）。参数：file/out 均为**相对工作区**路径（含项目目录前缀，与 read_file 同约定，如 file=model1/model1.scad、out=model1/good → 生成 model1/good.csg）。有语法错误时输出文本含 ERROR:（如 \"ERROR: Parser error\"）且不生成 .csg 文件——退出码不可靠（解析失败也可能返回 0），以输出文本和文件存在为准。⚠️ 输出目录必须已存在。注意：非流形/布尔失败等几何问题只在 preview/render 完整渲染时暴露，validate 查不出。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": ".scad 文件相对工作区路径，含项目目录前缀（如 model1/model1.scad）"
+          },
+          "out": {
+            "type": "string",
+            "description": "输出基础路径（不带扩展名），相对工作区含项目目录前缀（如 model1/good → model1/good.csg；用子目录需先创建）"
+          }
+        },
+        "required": [
+          "file",
+          "out"
+        ]
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "openscad"
+      ],
+      "category": "modify",
+      "cli": {
+        "command": [
+          "{settings.toolchain.active.path}/openscad.com",
+          "-o",
+          "{out}.csg",
+          "--check-parameters=true",
+          "{file}"
+        ],
+        "env": {
+          "OPENSCADPATH": "{pluginDir}/lib"
+        },
+        "timeoutMs": 60000
+      }
+    },
+    {
+      "name": "version",
+      "description": "查看已检测到的 OpenSCAD 版本（验证工具链可用；核心命令两版兼容，旧版 2021.01 同样适用）。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "openscad"
+      ],
+      "category": "query",
+      "cli": {
+        "command": [
+          "{settings.toolchain.active.path}/openscad.com",
+          "--version"
+        ],
+        "timeoutMs": 15000
+      }
+    },
+    {
+      "name": "openscad_gui",
+      "description": "打开 OpenSCAD 图形界面（GUI）并加载指定 .scad 文件——用户在可视化窗口里查看/编辑/手动操作模型（独立于本软件，立即返回不等待窗口关闭）。参数：file=.scad 相对工作区路径（含项目目录前缀，如 model1/model1.scad；通常传当前正在编辑的 .scad）。适合用户想亲眼确认模型/手动调整时调用。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": ".scad 文件相对工作区路径，含项目目录前缀（如 model1/model1.scad）；通常传当前激活的 .scad"
+          }
+        },
+        "required": [
+          "file"
+        ]
+      },
+      "transport": "cli",
+      "projectTypes": [
+        "openscad"
+      ],
+      "category": "execute",
+      "cli": {
+        "command": [
+          "{settings.toolchain.active.path}/openscad.exe",
+          "{file}"
+        ],
+        "detached": true,
+        "timeoutMs": 10000
+      }
+    }
+  ],
+  "skills": [
+    {
+      "name": "openscad-modeling",
+      "description": "OpenSCAD 程序化建模：写/改 .scad → 三视角 PNG 看图自纠 → 渲染 STL/3MF",
+      "prompt": "OpenSCAD 建模工作流：\n1. 先写/改 .scad（项目根），用 plugin_openscad-toolchain_validate(file=..., out=...) 快速查语法（输出含 ERROR: 即失败）\n2. 用 plugin_openscad-toolchain_preview(file=..., out=...) 渲染三视角 PNG（{out}_front.png / {out}_top.png / {out}_iso.png），再用 analyze_image(path=...) 逐张看图检查模型\n3. 发现尺寸/形状问题 → 改 .scad 顶层常量/代码 → 重新 preview 对比；echo() 测量值在工具输出里可直接读来自检\n4. 定稿后 plugin_openscad-toolchain_render(file=..., out=xxx.stl, format=binstl) 导出 STL（或 3mf）；单参数变体用 render_variant(..., d=\"length=60\")；多参数变体用 render_set(file=..., out=..., params=customizer.json)（customizer JSON 格式 {\"parameterSets\":{\"Default\":{...}},\"fileFormatVersion\":\"1\"}，一次覆盖多参数不改源码；validate 会同时报未定义变量 WARNING）\n\n输出路径约定：一律**相对工作区**（含项目目录前缀，与 read_file 同约定，如 file=model1/model1.scad、out=model1/box.stl）；推荐输出到项目目录内（如 model1/box.stl，免建子目录）；要用 build/ 等子目录时**必须先创建该目录**（terminal 或 write_file 建占位），OpenSCAD 不自动建目录、报 'not a directory'。format 取值 binstl/asciistl/3mf/amf；不要导 svg（3D 模型不支持）。\n\n语言要点：变量不可变（赋值即绑定）；$fn 控制曲面细分（预览用低值 32，最终渲染按需）；Z 轴向上；单位 mm；共面布尔需留 epsilon（如 0.001）避免非流形；text() 需字体（Windows 默认 Arial）；import() 可读 STL 等。\n\nBOSL2（内置库可用）：include <BOSL2/std.scad> 后用 cuboid(size, chamfer=)/cyl(d=,h=) 等高级原语比裸 OpenSCAD 更易建倒角。螺纹/螺丝：include <BOSL2/threading.scad> + include <BOSL2/screws.scad>（std.scad 不含螺纹模块，须显式 include）；thread_helix(d=, pitch=, thread_depth=, starts=, turns=)（长度=turns×pitch，无长度参数）；螺丝用 screw(\"M6x1\", length=, head=\"hex\")。"
+    }
+  ],
+  "commands": [
+    {
+      "id": "openscad.open_gui",
+      "title": "在 OpenSCAD 中打开",
+      "icon": "external-link",
+      "kind": "action",
+      "placement": "plugin.panel",
+      "transport": "cli",
+      "cli": {
+        "command": [
+          "{settings.toolchain.active.path}/openscad.exe",
+          "{activeFile}"
+        ],
+        "detached": true,
+        "timeoutMs": 10000
+      },
+      "filePattern": ".scad$"
+    },
+    {
+      "id": "openscad.render",
+      "title": "导出 STL",
+      "icon": "download",
+      "kind": "action",
+      "placement": "plugin.panel",
+      "transport": "cli",
+      "cli": {
+        "command": [
+          "{settings.toolchain.active.path}/openscad.com",
+          "-o",
+          "{out}",
+          "--export-format",
+          "binstl",
+          "{activeFile}"
+        ],
+        "env": {
+          "OPENSCADPATH": "{pluginDir}/lib"
+        },
+        "stream": true,
+        "streamChannel": "compile:onOutput",
+        "timeoutMs": 300000
+      },
+      "filePattern": ".scad$"
+    }
+  ],
+  "installer": {
+    "url": "https://files.openscad.org/snapshots/",
+    "fileName": "openscad-nightly.zip",
+    "fileNamePattern": "OpenSCAD-*-x86-64.zip",
+    "depName": "openscad",
+    "unzip": true
+  }
+}

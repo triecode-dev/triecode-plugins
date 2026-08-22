@@ -1,0 +1,18 @@
+{
+  "name": "easyeda-toolchain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "立创EDA(EasyEDA) 桥接插件 —— MCP 服务器（stdio）+ WebSocket 桥（127.0.0.1），对接 fork 扩展 triecode-easyeda-gateway",
+  "scripts": {
+    "build:bridge": "node server/build.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "jszip": "^3.10.1"
+  }
+}

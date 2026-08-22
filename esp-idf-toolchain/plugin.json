@@ -1,7 +1,7 @@
 {
   "id": "espressif-idf-toolchain",
   "name": "ESP-IDF 工具链",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "ESP-IDF 嵌入式工具链：图形化 Kconfig 配置、编译/烧录/目标芯片、串口日志、AI 工具。检测复用本机已装 ESP-IDF（可一键下载官方安装器）。",
   "developer": "TrieCode",
   "icon": "espressif",
@@ -137,7 +137,7 @@
     }
   },
   "installer": {
-    "url": "https://dl.espressif.com/dl/esp-idf/idf-installer.exe",
+    "url": "https://dl.espressif.cn/dl/idf-installer/esp-idf-tools-setup-online-2.4.1.exe",
     "fileName": "idf-installer.exe"
   },
   "projectDetection": {

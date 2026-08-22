@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>立创EDA 状态</title>
+<style>
+  /* TrieCode 设计 token（与软件 tokens.css 同源）：
+     浅色默认；宿主会推 host.theme 设置 data-theme；未收到时跟随系统深浅 */
+  :root, [data-theme="light"] {
+    --surface-0: #f5f6f8; --surface-1: #ffffff; --surface-2: #f0f1f3; --surface-3: #e9ebef;
+    --surface-hover: rgba(15, 23, 42, .055);
+    --text: #2b2f36; --text-2: #5b6470; --text-3: #9aa2ad;
+    --border-weak: #eceef1; --border: #e2e5ea;
+    --accent: #2563eb; --accent-hover: #1d4ed8; --accent-soft: rgba(37, 99, 235, .10);
+    --success: #16a34a; --success-soft: rgba(22, 163, 74, .10);
+    --warning: #d97706; --warning-soft: rgba(217, 119, 6, .10);
+    --error: #dc2626; --error-soft: rgba(220, 38, 38, .10);
+  }
+  [data-theme="dark"] {
+    --surface-0: #0d1117; --surface-1: #131820; --surface-2: #1a212b; --surface-3: #232c38;
+    --surface-hover: rgba(255, 255, 255, .07);
+    --text: #e6edf3; --text-2: #9da7b3; --text-3: #6e7681;
+    --border-weak: #20262e; --border: #2b333d;
+    --accent: #3b82f6; --accent-hover: #60a5fa; --accent-soft: rgba(59, 130, 246, .14);
+    --success: #4ade80; --success-soft: rgba(74, 222, 128, .12);
+    --warning: #fbbf24; --warning-soft: rgba(251, 191, 36, .12);
+    --error: #f87171; --error-soft: rgba(248, 113, 113, .12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+      --surface-0: #0d1117; --surface-1: #131820; --surface-2: #1a212b; --surface-3: #232c38;
+      --surface-hover: rgba(255, 255, 255, .07);
+      --text: #e6edf3; --text-2: #9da7b3; --text-3: #6e7681;
+      --border-weak: #20262e; --border: #2b333d;
+      --accent: #3b82f6; --accent-hover: #60a5fa; --accent-soft: rgba(59, 130, 246, .14);
+      --success: #4ade80; --success-soft: rgba(74, 222, 128, .12);
+      --warning: #fbbf24; --warning-soft: rgba(251, 191, 36, .12);
+      --error: #f87171; --error-soft: rgba(248, 113, 113, .12);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    /* 与软件左侧栏一致（surface-1）：浅色=白，深色=深面板 */
+    background: var(--surface-1); color: var(--text);
+    font-family: system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    font-size: 13px; line-height: 1.6; padding: 14px;
+  }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 12px;
+  }
+  .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .icon-btn {
+    border: none; background: transparent; color: var(--text-2); cursor: pointer;
+    font-size: 15px; padding: 3px 7px; border-radius: 6px; line-height: 1;
+  }
+  .icon-btn:hover { background: var(--surface-hover); color: var(--accent); }
+  .row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; gap: 8px; }
+  .row .k { color: var(--text-2); white-space: nowrap; }
+  .row .v { color: var(--text); text-align: right; word-break: break-all; }
+  .win { display: flex; align-items: center; gap: 6px; padding: 3px 0; color: var(--text); }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .dot.ok { background: var(--success); box-shadow: 0 0 8px var(--success); }
+  .dot.bad { background: var(--error); box-shadow: 0 0 8px var(--error); }
+  .dot.warn { background: var(--warning); }
+  .dot.off { background: var(--text-3); opacity: .5; }
+  /* 窗口列表状态点：默认品牌蓝，活动窗口变绿色（与「已连接」点一致） */
+  .dot.idle { background: var(--accent); }
+  .dot.active { background: var(--success); box-shadow: 0 0 8px var(--success); }
+  .title { font-weight: 600; }
+  .muted { color: var(--text-2); }
+  .warn-box { border: 1px solid var(--warning-soft); background: var(--warning-soft); border-radius: 8px; padding: 10px 12px; margin-top: 10px; color: var(--warning); }
+  .warn-box code { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--text); word-break: break-all; }
+</style>
+<script>
+  /* 首帧前读取宿主注入的 ?theme=（防暗色主题下从其它活动栏切过来闪白） */
+  (function () {
+    try {
+      var t = new URLSearchParams(location.search).get('theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+  <div class="card">
+    <div class="card-head">
+      <span class="title">🔌 桥与 EDA 连接</span>
+      <button class="icon-btn" id="refresh" title="刷新状态">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+      </button>
+    </div>
+    <div class="row"><span class="k">桥服务</span><span class="v" id="bridge"><span class="dot off"></span>加载中…</span></div>
+    <div class="row"><span class="k">监听端口</span><span class="v" id="port">—</span></div>
+    <div class="row"><span class="k">EDA 窗口</span><span class="v" id="winCount">—</span></div>
+    <div class="row" style="align-items:flex-start"><span class="k">窗口列表</span><span class="v" id="winList" style="text-align:right">—</span></div>
+    <div class="row"><span class="k">EDA 版本</span><span class="v" id="edaVersion">—</span></div>
+    <div class="row"><span class="k">工程已打开</span><span class="v" id="projectOpened">—</span></div>
+    <div class="row"><span class="k">当前文档</span><span class="v" id="docType">—</span></div>
+  </div>
+
+  <div class="warn-box" id="hint" style="display:none">
+    ⚠️ EDA 未连接。请确认：
+    <div style="margin-top:6px">① 立创EDA 已打开；</div>
+    <div>② 已导入扩展 <code>assets/triecode-easyeda-gateway_v1.0.0.eext</code>（顶部「高级 → 扩展管理器 → 导入」）并勾选<b>允许外部交互</b>；</div>
+    <div>③ 稍等几秒自动重连，或在 EDA 菜单「TrieCode EDA 桥 → 重新连接」。</div>
+  </div>
+
+  <div class="muted" style="font-size:12px">扩展安装/重连指引：点左侧栏「扩展导入向导」标签。</div>
+
+<script>
+(function () {
+  var PLUGIN = 'easyeda-toolchain';
+  var nextId = 1, pending = {};
+
+  function send(method, args) {
+    return new Promise(function (resolve, reject) {
+      var id = 'm' + (nextId++);
+      pending[id] = { resolve: resolve, reject: reject };
+      window.parent.postMessage({ type: 'host.invoke', id: id, method: method, args: args || {} }, '*');
+    });
+  }
+
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (!d || typeof d !== 'object') return;
+    // 宿主主题推送：软件里切深浅色 → 实时跟随
+    if (d.type === 'host.theme' && (d.theme === 'light' || d.theme === 'dark')) {
+      document.documentElement.setAttribute('data-theme', d.theme);
+      return;
+    }
+    if (d.type === 'host.invoke.result') {
+      var p = pending[d.id];
+      if (!p) return;
+      delete pending[d.id];
+      d.ok ? p.resolve(d.data) : p.reject(new Error(d.error || 'invoke failed'));
+    }
+  });
+
+  function $(id) { return document.getElementById(id); }
+
+  function docTypeName(t) {
+    var map = { '-1': 'HOME', '0': '空白', '1': '原理图', '2': '符号', '3': 'PCB', '4': '封装', '26': '面板' };
+    return map[String(t)] || (typeof t === 'number' ? '未知(' + t + ')' : '—');
+  }
+
+  // 解包 host.invoke('command:invoke') 的返回信封：
+  //   命令返回 { ok, text }，text 可能是字符串，也可能是 MCP CallToolResult {content:[{type:'text',text}]}
+  function extractText(data) {
+    if (typeof data === 'string') return data;
+    if (data && typeof data === 'object') {
+      if (data.ok === false) throw new Error(data.error || '命令执行失败');
+      var target = 'text' in data ? data.text : data;
+      if (typeof target === 'string') return target;
+      if (Array.isArray(target.content) && target.content[0]) {
+        return typeof target.content[0].text === 'string'
+          ? target.content[0].text
+          : JSON.stringify(target);
+      }
+      return JSON.stringify(target);
+    }
+    return String(data);
+  }
+
+  function renderStatus(data) {
+    var s;
+    try { s = JSON.parse(extractText(data)); }
+    catch (e) { s = null; }
+
+    var bridgeEl = $('bridge');
+    if (!s) {
+      bridgeEl.innerHTML = '<span class="dot bad"></span>无法读取状态';
+      $('port').textContent = '';
+      $('winList').innerHTML = '<span class="muted">—</span>';
+      $('hint').style.display = 'block';
+      return;
+    }
+    $('port').textContent = s.port || '—';
+    $('winCount').textContent = s.edaWindowCount != null ? s.edaWindowCount : '—';
+
+    var connected = !!s.edaConnected;
+    bridgeEl.innerHTML = connected
+      ? '<span class="dot ok"></span>已连接'
+      : '<span class="dot off"></span>未连接';
+
+    // 窗口列表：按创建（连接）顺序显示「窗口 1/2/3…」，状态点默认品牌蓝、活动窗口变青
+    var wins = s.windows || [];
+    var winListEl = $('winList');
+    if (wins.length === 0) {
+      winListEl.innerHTML = '<span class="muted">—</span>';
+    } else {
+      winListEl.innerHTML = wins.map(function (w, i) {
+        var dotClass = w.active ? 'active' : 'idle'; // 活动→青，其余→品牌蓝
+        var num = w.order || (i + 1);
+        return '<div class="win"><span class="dot ' + dotClass + '"></span>窗口 ' + num + '</div>';
+      }).join('');
+    }
+
+    // 详情取活动窗口（无活动标记则取第一个）
+    var active = wins.find(function (w) { return w.active; }) || wins[0];
+    if (active) {
+      $('edaVersion').textContent = active.edaVersion || '—';
+      $('projectOpened').textContent = active.projectOpened === true ? '是' : (active.projectOpened === false ? '否' : '—');
+      $('docType').textContent = docTypeName(active.documentType);
+    } else {
+      $('edaVersion').textContent = '—';
+      $('projectOpened').textContent = '—';
+      $('docType').textContent = '—';
+    }
+    $('hint').style.display = connected ? 'none' : 'block';
+  }
+
+  function refresh() {
+    send('command:invoke', { commandId: PLUGIN + '.status', args: {} })
+      .then(renderStatus)
+      .catch(function (e) {
+        $('bridge').innerHTML = '<span class="dot bad"></span>命令调用失败';
+        $('port').textContent = e.message || 'error';
+        $('hint').style.display = 'block';
+      });
+  }
+
+  $('refresh').addEventListener('click', refresh);
+
+  // ready 握手
+  window.parent.postMessage({ type: 'ready' }, '*');
+  refresh();
+  setInterval(refresh, 3000);
+})();
+</script>
+</body>
+</html>

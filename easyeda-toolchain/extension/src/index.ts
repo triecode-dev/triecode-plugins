@@ -556,7 +556,10 @@ function tryConnectToPort(port: number, sessionId: number): Promise<boolean> {
 								// 2026-08-20 审计修复（P0-1）：从 handshake 获取桥 token 并持久化。
 								// 桥每次开始都生成一个 token（可用命令行参数 / EASYEDA_TOKEN env 预设）。
 								// 扩展必须存储桥下发的 token，register 时携带它，桥校验后才接受注册。
-								// 桥重启（新进程新 token）→ 扩展存的新 token 覆盖旧 token，register 带新 token → 校验通过。
+								// ⚠️ 2026-08-22 排查确认：**必须用本次 handshake 下发的 token 注册**，不能用存储的旧 token——
+								// 桥重启（新进程新 token）后旧 token 已失效，且 setExtensionUserConfig 是异步落盘，
+								// 紧跟的 get 可能仍读到旧值 → register 带旧 token 被桥拒绝（桥发 auth error 但不关连接）
+								// → 扩展显示「已连接」但桥从未注册窗口 → 软件端状态一直「未连接」（用户反馈的症状）。
 								const handshakeToken = typeof msg.token === 'string' && msg.token ? msg.token : '';
 								if (handshakeToken) {
 									void eda.sys_Storage.setExtensionUserConfig(STORAGE_KEY_TOKEN, handshakeToken).catch(() => {});
@@ -567,7 +570,8 @@ function tryConnectToPort(port: number, sessionId: number): Promise<boolean> {
 									windowId,
 									timestamp: Date.now(),
 								};
-								const token = typeof storedToken === 'string' && storedToken ? storedToken : handshakeToken;
+								const token = handshakeToken
+									|| (typeof storedToken === 'string' && storedToken ? storedToken : '');
 								if (token) {
 									registerMsg.token = token;
 								}
@@ -669,6 +673,15 @@ function scheduleRetry(sessionId: number, delay: number): void {
 async function handleMessage(msg: BridgeMessage): Promise<void> {
 	if (msg.type === 'ping') {
 		sendJson({ type: 'pong', id: msg.id, timestamp: Date.now() });
+		return;
+	}
+
+	if (msg.type === 'error' && String(msg.id || '') === 'auth') {
+		// 2026-08-22：桥认证失败（register 带旧 token 被拒）→ 主动重连自愈。
+		// 桥拒绝后 socket 不关闭，扩展若无动作会永远「显示已连接但软件端未连接」——重连会用本次 handshake 的新 token 重注册成功。
+		console.warn('[TrieCode-EDA] 桥认证失败，重新连接...');
+		cancelConnectionFlow();
+		void scanAndConnect();
 		return;
 	}
 

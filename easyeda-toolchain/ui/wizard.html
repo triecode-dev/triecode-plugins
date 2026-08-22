@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>立创EDA 扩展导入向导</title>
+<style>
+  /* TrieCode 设计 token（与软件 tokens.css 同源）：浅色默认 + 深色，宿主推 host.theme */
+  :root, [data-theme="light"] {
+    --surface-0: #f5f6f8; --surface-1: #ffffff; --surface-2: #f0f1f3; --surface-3: #e9ebef;
+    --surface-hover: rgba(15, 23, 42, .055);
+    --text: #2b2f36; --text-2: #5b6470; --text-3: #9aa2ad;
+    --border-weak: #eceef1; --border: #e2e5ea;
+    --accent: #2563eb; --accent-hover: #1d4ed8; --accent-soft: rgba(37, 99, 235, .10);
+    --success: #16a34a; --warning: #d97706; --warning-soft: rgba(217, 119, 6, .10);
+  }
+  [data-theme="dark"] {
+    --surface-0: #0d1117; --surface-1: #131820; --surface-2: #1a212b; --surface-3: #232c38;
+    --surface-hover: rgba(255, 255, 255, .07);
+    --text: #e6edf3; --text-2: #9da7b3; --text-3: #6e7681;
+    --border-weak: #20262e; --border: #2b333d;
+    --accent: #3b82f6; --accent-hover: #60a5fa; --accent-soft: rgba(59, 130, 246, .14);
+    --success: #4ade80; --warning: #fbbf24; --warning-soft: rgba(251, 191, 36, .12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+      --surface-0: #0d1117; --surface-1: #131820; --surface-2: #1a212b; --surface-3: #232c38;
+      --surface-hover: rgba(255, 255, 255, .07);
+      --text: #e6edf3; --text-2: #9da7b3; --text-3: #6e7681;
+      --border-weak: #20262e; --border: #2b333d;
+      --accent: #3b82f6; --accent-hover: #60a5fa; --accent-soft: rgba(59, 130, 246, .14);
+      --success: #4ade80; --warning: #fbbf24; --warning-soft: rgba(251, 191, 36, .12);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    /* 与软件左侧栏一致（surface-1） */
+    background: var(--surface-1); color: var(--text);
+    font-family: system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    font-size: 13px; line-height: 1.7; padding: 16px;
+  }
+  h1 { font-size: 16px; margin-bottom: 6px; }
+  .sub { color: var(--text-2); font-size: 12px; margin-bottom: 14px; }
+  .step {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 12px;
+  }
+  .step .n {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 50%; background: var(--accent-soft);
+    color: var(--accent); font-weight: 700; font-size: 12px; margin-right: 8px;
+  }
+  .step b { color: var(--text); }
+  code {
+    font-family: ui-monospace, Consolas, monospace; font-size: 11px;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px;
+    padding: 2px 6px; color: var(--text); word-break: break-all;
+  }
+  .path {
+    display: block; background: var(--surface-3); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-family: ui-monospace, Consolas, monospace; font-size: 11px;
+    color: var(--success); margin-top: 6px; word-break: break-all;
+  }
+  .ok { color: var(--success); }
+  .warn { color: var(--warning); }
+</style>
+<script>
+  /* 首帧前读取宿主注入的 ?theme=（防暗色主题切换闪白） */
+  (function () {
+    try {
+      var t = new URLSearchParams(location.search).get('theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+  <h1>📐 立创EDA 扩展导入向导</h1>
+  <div class="sub">把 TrieCode 的桥接扩展装进立创EDA（EasyEDA 专业版），一次即可，后续自动连接。</div>
+
+  <div class="step"><span class="n">1</span><b>找到扩展文件</b>（插件安装目录内）：
+    <code class="path">%APPDATA%\TrieCode\plugins\easyeda-toolchain\assets\triecode-easyeda-gateway_v1.0.0.eext</code>
+    <div style="margin-top:6px;color:var(--text-2)">若找不到，可回到 TrieCode 重新安装插件，或复制上面路径在资源管理器打开。</div>
+  </div>
+
+  <div class="step"><span class="n">2</span><b>导入到立创EDA</b>
+    <div style="margin-top:4px">打开立创EDA 专业版 → 顶部菜单 <code>高级</code> → <code>扩展管理器…</code> → 点 <code>导入</code>，选择上面的 <code>.eext</code> 文件。</div>
+    <div style="margin-top:4px;color:var(--text-2)">（旧版 V2 路径：<code>设置</code> → <code>扩展</code> → <code>扩展管理器…</code> → <code>导入扩展</code>）</div>
+  </div>
+
+  <div class="step"><span class="n">3</span><b>启用并允许外部交互</b>
+    <div style="margin-top:4px">在已安装列表找到 <b>TrieCode EDA 桥</b>，确认 <b>启用</b>，并勾选 <b class="ok">允许外部交互</b> 与 <b class="ok">显示在顶部菜单</b>。</div>
+    <div style="margin-top:4px" class="warn">⚠️ 不勾选「允许外部交互」时，EDA 无法建立 WebSocket 连接——这是最常见的问题。</div>
+  </div>
+
+  <div class="step"><span class="n">4</span><b>确认连接</b>
+    <div style="margin-top:4px">顶部菜单出现 <code>TrieCode EDA 桥</code>，点击 <code>重新连接</code>。回到 TrieCode，刷新「立创EDA 状态」面板，应显示 <b class="ok">已连接</b>。</div>
+    <div style="margin-top:4px">然后告诉 AI：<code>检查立创EDA 连接状态，并读取当前工程信息</code>。</div>
+  </div>
+
+  <div class="step" style="border-color:var(--warning-soft)">
+    <b>常见问题</b>
+    <div style="margin-top:4px">• 一直显示「桥未连接」→ 确认桥进程在跑（TrieCode 启用插件即自动起桥），EDA 里点「重新连接」。</div>
+    <div style="margin-top:4px">• 连接后无工程 → 这是正常的，AI 会先询问你要操作哪个工程。</div>
+    <div style="margin-top:4px">• 想卸载 → EDA 扩展管理器里删除该扩展即可，不影响 TrieCode 插件。</div>
+  </div>
+
+  <script>
+    // ready 握手（webview 协议必需）+ 接收宿主主题
+    window.addEventListener('message', function (e) {
+      var d = e.data;
+      if (d && d.type === 'host.theme' && (d.theme === 'light' || d.theme === 'dark')) {
+        document.documentElement.setAttribute('data-theme', d.theme);
+      }
+    });
+    window.parent.postMessage({ type: 'ready' }, '*');
+  </script>
+</body>
+</html>

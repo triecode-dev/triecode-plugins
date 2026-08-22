@@ -14,6 +14,7 @@ TrieCode 官方插件集（开源版）——面向嵌入式和电子设计自�
 | [esp-idf-toolchain](esp-idf-toolchain/) | ESP-IDF 嵌入式开发工具链 |
 | [stm32-cube-toolchain](stm32-cube-toolchain/) | STM32Cube 裸机脚手架（CMSIS 器件支持 + 编译/烧录） |
 | [wokwi-simulator](wokwi-simulator/) | Wokwi 在线仿真器（虚拟串口 / 自动化测试 / 截图） |
+| [openscad-toolchain](openscad-toolchain/) | OpenSCAD 3D 建模：AI 写 .scad → 三视角预览自纠 → 渲染 STL/3MF，内置 BOSL2 库、一键下载便携版 |
 | [plugin-dev-toolchain](plugin-dev-toolchain/) | 面向开发者的插件开发脚手架（AI 创建插件） |
 | [easyeda-toolchain](easyeda-toolchain/) | 立创EDA(EasyEDA) 深度集成：原理图自动布局与 A\* 绕障布线引擎、40+ 工具、EDA 端扩展 |
 

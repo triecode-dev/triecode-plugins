@@ -1,8 +1,8 @@
 {
   "id": "easyeda-toolchain",
   "name": "立创EDA",
-  "version": "0.2.0",
-  "description": "把立创EDA(EasyEDA)接入 AI：工程/原理图/PCB/器件库/DRC 自动化设计。桥进程由本插件托管，EDA 侧需安装随包分发的 triecode-easyeda-gateway 扩展。需配合最新版软件（含 {nodeBin} 统一 Node 运行时）。",
+  "version": "0.2.3",
+  "description": "把立创EDA(EasyEDA)接入 AI：工程/原理图/PCB/器件库/DRC 自动化设计。桥进程由本插件托管，EDA 侧需安装随包分发的 triecode-easyeda-gateway 扩展。需配合最新版软件（含 {nodeBin} 统一 Node 运行时）。v0.2.3：修复桥重启后连接状态不一致（扩展 register 改用本次握手新 token + 认证失败自动重连自愈）——软件重启后 EDA 扩展不再「显示已连接但软件端未连接」。",
   "developer": "TrieCode",
   "icon": "easyeda",
   "category": "EDA 设计",
@@ -15,7 +15,8 @@
       "name": "node",
       "version": "22.14.0",
       "url": "https://registry.npmmirror.com/-/binary/node/v22.14.0/node-v22.14.0-win-x64.zip",
-      "unzip": true
+      "unzip": true,
+      "sha256": "55b639295920b219bb2acbcfa00f90393a2789095b7323f79475c9f34795f217"
     }
   ],
   "mcpServers": [
@@ -1168,7 +1169,7 @@
       "title": "刷新连接状态",
       "icon": "refresh",
       "kind": "action",
-      "placement": "toolbar.action",
+      "placement": "plugin.panel",
       "transport": "mcp",
       "mcp": {
         "server": "easyeda",
@@ -1182,7 +1183,7 @@
       "icon": "wand",
       "kind": "open-view",
       "view": "import-wizard",
-      "placement": "toolbar.action",
+      "placement": "plugin.panel",
       "description": "打开立创EDA 扩展导入向导（分步安装桥接扩展）",
       "hidden": true
     }

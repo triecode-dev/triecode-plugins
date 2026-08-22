@@ -1,7 +1,7 @@
 {
   "id": "wokwi-simulator",
   "name": "Wokwi 模拟器",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Wokwi 嵌入式电路模拟器：用 wokwi-cli 在本地/云端仿真引擎上运行 Arduino/ESP32/STM32 等固件，串口输出实时可测、自动化场景断言、电路图校验、截图。",
   "developer": "TrieCode",
   "icon": "wokwi",
@@ -267,7 +267,7 @@
     },
     {
       "name": "wokwi_compile_arduino",
-      "description": "Compile the current Arduino .ino project to firmware for Wokwi simulation using arduino-cli (must be on PATH, e.g. installed by the Arduino plugin or manually). Outputs to build/ and wokwi.toml points to it. Returns compile result; then run wokwi_run.",
+      "description": "Compile the current Arduino .ino project to firmware for Wokwi simulation using arduino-cli. NOTE: arduino-cli must be discoverable by the CLI driver (in PATH, or a manually added system arduino-cli); the Arduino CLI 工具链插件下载的 arduino-cli 位于应用数据目录、不加入 PATH。Outputs to build/ and wokwi.toml points to it. Returns compile result; then run wokwi_run.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -326,7 +326,7 @@
       "title": "运行模拟",
       "icon": "play",
       "kind": "action",
-      "placement": "toolbar.action",
+      "placement": "plugin.panel",
       "when": "projectType=wokwi && activeToolchain=wokwi-simulator",
       "transport": "cli",
       "cli": {
@@ -354,7 +354,7 @@
       "title": "校验电路图",
       "icon": "search-check",
       "kind": "action",
-      "placement": "toolbar.action",
+      "placement": "plugin.panel",
       "when": "projectType=wokwi && activeToolchain=wokwi-simulator",
       "transport": "cli",
       "cli": {
